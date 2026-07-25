@@ -6,14 +6,10 @@ group 'com.github.eprendre.customsources'
 version '1.0-SNAPSHOT'
 
 repositories {
-    maven {
-        url 'https://maven.aliyun.com/nexus/content/groups/public/'
-    }
-    maven {
-        url 'https://maven.aliyun.com/nexus/content/repositories/jcenter'
-    }
-//    mavenCentral()
-//    jcenter()
+    mavenCentral()
+//    maven {
+//        url 'https://maven.aliyun.com/repository/public'
+//    }
 }
 
 dependencies {
@@ -32,14 +28,16 @@ dependencies {
     testImplementation 'com.willowtreeapps.assertk:assertk-jvm:0.16'
 }
 
-//compileKotlin {
-//    kotlinOptions.jvmTarget = "1.8"
-//}
-//compileTestKotlin {
-//    kotlinOptions.jvmTarget = "1.8"
-//}
-kotlin {
-    jvmToolchain(18)
+// 舊版 d8 只認 Java 8 bytecode，jvmTarget 固定 1.8；用 JDK 17 執行 gradle 即可
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
 }
 
 jar {

@@ -30,11 +30,10 @@ object SourceEntry {
      */
     @JvmStatic
     fun getSources(): List<TingShu> {
+        // 已移除站点确认消失的源:九州影视(unss.net 转停放页)、
+        // 南瓜影视(nangua55 跳广告页)、樱花动漫(yinghuacd DNS 无记录)
         return listOf(
-            NanGua,
-            JiuZhou,
-            NiuNiu,
-            YingHuaCD
+            NiuNiu
         )
     }
 }

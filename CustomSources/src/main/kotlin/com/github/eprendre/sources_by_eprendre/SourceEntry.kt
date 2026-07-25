@@ -26,43 +26,33 @@ object SourceEntry {
     }
 
     /**
-     * 返回此包下面的源, 若编译不通过请删除下面不存在的源。
+     * 返回此包下面的源。
+     *
+     * 已移除站点确认消失(域名过期停放、跳转广告页、DNS 无记录)的源:
+     * 幻听网(ting89)、六听网(6ting)、456听书(ting456)、听书宝(tingshubao)、
+     * 声波FM(shengbo)、56听书(ting56)、静听网(audio698)、心魔听书(ixinmoo)、
+     * 芒果听书(mgting)、中版有声(3eol)、爱听书(2uxs)、520听书(fushu520)、
+     * 我爱听评书(tpsge)、麻辣听书(malatingshu)、有兔阅读(mituyuedu)。
      */
     @JvmStatic
     fun getSources(): List<TingShu> {
-        HuanTingWang.c24e329b36b542f4adde9694d4b28a4r()
         return listOf(
-            HuanTingWang,
-            YouTuYueDu,
             YunTuYouSheng,
             KuWo,
             KouDaiWeiKeTang,
             BoKanYouSheng,
-            ZhongBanYouSheng,
             CCTV,
             YouShengXiaoShuoBa,
-            ShengBoFM,
             IFish,
             TingChina,
             BiliBili,
-            JingTing,
-            XinMo,
             TingShu74,
-            TingShuBao,
             SouGou,
-            Mgting,
-            AiTingShu,
-            Wap520,
             LianTingWang,
-            WoAiTingPingShu,
             JiHe,
             HaiYangTingShu,
-            M456TingShu,
-            LiuTingWang,
             VBus,
             JuTingWang,
-            M56TingShu,
-            MaLaTingShu,
             LanRenTingShu
         )
     }
