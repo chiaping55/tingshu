@@ -15,7 +15,6 @@ import org.jsoup.Connection
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
-import java.io.ByteArrayOutputStream
 import java.net.URLEncoder
 import kotlin.random.Random
 
@@ -45,8 +44,8 @@ abstract class PtcmsTingShu : TingShu() {
 
     override fun isMultipleEpisodePages() = true
 
-    /** guard cookie 有效期 2 小时，存下来复用，避免每个请求都要握手两次 */
-    private val cookies = HashMap<String, String>()
+    /** 反爬挑战处理，cookie 存在里面复用，避免每个请求都要握手两次 */
+    private val guard = PtcmsGuard()
 
     private val pageList = ArrayList<Int>()
 
@@ -65,47 +64,45 @@ abstract class PtcmsTingShu : TingShu() {
      */
     protected open fun notifyLoading(pageInfo: String?) = notifyLoadingEpisodes(pageInfo)
 
+    /** 同上，app 里弹提示；测试里覆写成打印即可 */
+    protected open fun toast(message: String) = showToast(message)
+
     private fun connect(url: String, referer: String?): Connection {
-        val connection = configure(Jsoup.connect(url)).cookies(cookies)
+        val connection = configure(Jsoup.connect(url))
+        userAgent?.let { connection.userAgent(it) }
         if (referer != null) {
             connection.referrer(referer)
         }
         return connection
     }
 
+    internal fun fetch(url: String, referer: String? = null): Document =
+        guard.request { connect(url, referer) }.parse()
+
+    internal fun fetchHtml(url: String, referer: String? = null): String =
+        guard.request { connect(url, referer) }.body()
+
+    /** 有些站的搜索是 POST 表单 */
+    internal fun fetchPost(url: String, data: Map<String, String>, referer: String? = null): Document =
+        guard.request { connect(url, referer).method(Connection.Method.POST).data(data) }.parse()
+
+    /** 列表里书名带的固定后缀，子类需要时覆写，例如"有声小说" */
+    protected open val titleSuffix: String = ""
+
     /**
-     * 请求页面并处理 guard。
+     * 覆盖 UA。
      *
-     * 挑战页会同时下发 pt_browser_id cookie，而 js 里那个 token 就是用这个 id 算出来的，
-     * 所以两个 cookie 都要带上服务端才认，只补 pt_guid 会一直拿到挑战页。
+     * 默认走 app 设置里的 UA，但有的站会拿 UA 当风控依据 —— 爱听书对 2019 年的
+     * Chrome 77 在章节目录页直接回 429（书籍页却放行，很容易误判成限流）。
+     * 这种站就在子类里指定一个较新的 UA，别依赖用户的设置。
      */
-    private fun request(url: String, referer: String?): Connection.Response {
-        var response = connect(url, referer).execute()
-        cookies.putAll(response.cookies())
-        val token = guardToken(response.body())
-        if (token != null) {
-            cookies["pt_guid"] = URLEncoder.encode(token, "UTF-8")
-            cookies["ptcms_guard_retry"] = "1"
-            response = connect(url, referer).execute()
-            cookies.putAll(response.cookies())
-        }
-        return response
-    }
-
-    internal fun fetch(url: String, referer: String? = null): Document = request(url, referer).parse()
-
-    internal fun fetchHtml(url: String, referer: String? = null): String = request(url, referer).body()
+    protected open val userAgent: String? = null
 
     /**
-     * guard 挑战页里藏着一段倒序的 base64，解出来是设置 pt_guid cookie 的 js。
-     * 返回 null 表示这次拿到的就是正常页面。
+     * 翻章节目录时每页之间的等待区间。有的站限流比较严(爱听书连翻会回 429)，
+     * 这种站要放慢，否则退避重试会让整体更慢。
      */
-    private fun guardToken(html: String): String? {
-        val reversed = Regex("""var\s+reversed\s*=\s*"([^"]+)"""")
-            .find(html)?.groupValues?.get(1) ?: return null
-        val script = String(base64Decode(reversed.reversed()), Charsets.UTF_8)
-        return Regex("""var\s+token\s*=\s*'([^']+)'""").find(script)?.groupValues?.get(1)
-    }
+    protected open val episodePageDelay: LongRange = 100L..500L
 
     override fun search(keywords: String, page: Int): Pair<List<Book>, Int> {
         val url = "$baseUrl/search.html?searchtype=name" +
@@ -118,9 +115,14 @@ abstract class PtcmsTingShu : TingShu() {
         val doc = fetch(url)
         val pager = doc.selectFirst("div.fanye")
         val currentPage = pager?.selectFirst("strong")?.text()?.trim()?.toIntOrNull() ?: 1
+        // 有"下一页"就用它；没有的话找页码等于当前页+1 的那个链接
         val nextUrl = pager?.select("a")
             ?.firstOrNull { it.text().contains("下一页") }
-            ?.absUrl("href") ?: ""
+            ?.absUrl("href")
+            ?: pager?.select("a")
+                ?.firstOrNull { it.text().trim().toIntOrNull() == currentPage + 1 }
+                ?.absUrl("href")
+            ?: ""
         return Category(parseBooks(doc), currentPage, parseTotalPage(doc, currentPage), url, nextUrl)
     }
 
@@ -134,6 +136,10 @@ abstract class PtcmsTingShu : TingShu() {
         val intro = doc.selectFirst("div.book-des")?.text() ?: ""
         val artist = doc.select("div.book-info dd")
             .firstOrNull { it.text().contains("演播") }
+            ?.selectFirst("a")?.text() ?: ""
+        // 起点系详情页不给作者，爱听书给，所以取不到就留空
+        val author = doc.select("div.book-info dd")
+            .firstOrNull { it.text().contains("作者") }
             ?.selectFirst("a")?.text() ?: ""
 
         val episodes = ArrayList<Episode>()
@@ -149,17 +155,24 @@ abstract class PtcmsTingShu : TingShu() {
                 if (loadFullPages && totalPage > 1) {
                     pageList.clear()
                     pageList.addAll(2..totalPage)
-                    while (pageList.isNotEmpty()) {
-                        val page = pageList.removeAt(0)
-                        notifyLoading("$page / $totalPage")
-                        episodes.addAll(parseEpisodes(fetch("$dirUrl?page=$page&sort=asc", bookUrl)))
-                        Thread.sleep(Random.nextLong(100, 500))
+                    try {
+                        while (pageList.isNotEmpty()) {
+                            val page = pageList.removeAt(0)
+                            notifyLoading("$page / $totalPage")
+                            episodes.addAll(parseEpisodes(fetch("$dirUrl?page=$page&sort=asc", bookUrl)))
+                            Thread.sleep(Random.nextLong(episodePageDelay.first, episodePageDelay.last))
+                        }
+                    } catch (e: Exception) {
+                        // 站点限流或临时故障时，保留已经抓到的章节而不是整本失败；
+                        // 提示一下，免得用户以为这本书就只有这么多集。
+                        pageList.clear()
+                        toast("章节只加载了一部分(${episodes.size}集)，站点限流了，稍后重新进入可续加载")
                     }
                     notifyLoading(null)
                 }
             }
         }
-        return BookDetail(episodes, intro, artist, "", episodes.size, coverUrl)
+        return BookDetail(episodes, intro, artist, author, episodes.size, coverUrl)
     }
 
     override fun getAudioUrlExtractor(): AudioUrlExtractor {
@@ -176,7 +189,7 @@ abstract class PtcmsTingShu : TingShu() {
     internal fun resolveAudioUrl(chapterUrl: String): String {
         val playerUrl = fetch(chapterUrl).selectFirst("iframe#play")?.absUrl("src")
         if (playerUrl.isNullOrEmpty()) {
-            showToast("找不到播放器，站点可能改版了")
+            toast("找不到播放器，站点可能改版了")
             return ""
         }
         audioUrl(fetchHtml(playerUrl, chapterUrl)).let { if (it.isNotEmpty()) return it }
@@ -184,7 +197,7 @@ abstract class PtcmsTingShu : TingShu() {
             val url = audioUrl(fetchHtml(withSite(playerUrl, site), chapterUrl))
             if (url.isNotEmpty()) return url
         }
-        showToast("这一集所有线路都没有音频，换一集试试")
+        toast("这一集所有线路都没有音频，换一集试试")
         return ""
     }
 
@@ -218,7 +231,7 @@ abstract class PtcmsTingShu : TingShu() {
             Book(
                 imageUrl(item.selectFirst("div.list-imgbox img")),
                 titleLink.absUrl("href"),
-                titleLink.text(),
+                titleLink.text().removeSuffix(titleSuffix),
                 "",// 站点列表和详情页都不提供作者，只有演播
                 item.selectFirst("dd.list-book-cs span.book-author a")?.text() ?: ""
             ).apply {
@@ -248,6 +261,9 @@ abstract class PtcmsTingShu : TingShu() {
      */
     internal fun parseTotalPage(doc: Document, currentPage: Int): Int {
         val pager = doc.selectFirst("div.fanye") ?: return currentPage
+        // 有的站直接写"共 607 页"，这是最可靠的
+        Regex("""共\s*(\d+)\s*页""").find(pager.text())?.groupValues?.get(1)?.toIntOrNull()
+            ?.let { return it }
         val maxNumbered = pager.select("a, strong")
             .mapNotNull { it.text().trim().toIntOrNull() }
             .maxOrNull() ?: currentPage
@@ -263,29 +279,8 @@ abstract class PtcmsTingShu : TingShu() {
         return if (lazy.isNotEmpty()) lazy else img.absUrl("src")
     }
 
-    /**
-     * 自己实现 base64 解码：项目不引入 android 依赖，java.util.Base64 又要 api 26。
-     */
-    private fun base64Decode(input: String): ByteArray {
-        val out = ByteArrayOutputStream()
-        var buffer = 0
-        var bits = 0
-        for (char in input) {
-            val value = BASE64_ALPHABET.indexOf(char)
-            if (value < 0) continue// 跳过 '=' 和空白
-            buffer = (buffer shl 6) or value
-            bits += 6
-            if (bits >= 8) {
-                bits -= 8
-                out.write((buffer shr bits) and 0xFF)
-            }
-        }
-        return out.toByteArray()
-    }
 
     protected companion object {
-        private const val BASE64_ALPHABET =
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
         private val AUDIO_SUFFIXES = listOf(".mp3", ".m4a", ".aac", ".m4s", ".wav")
 
         /**

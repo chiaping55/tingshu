@@ -25,9 +25,9 @@ adb shell chmod 444 /sdcard/Android/data/com.github.eprendre.tingshu/files/jars/
 
 | 源 | 站点 | 模板 | 实测可播率 | 备注 |
 |---|---|---|---|---|
+| 爱听书 | www.itingshu.net | PTCMS | 未测(音频走 WebView) | 近年多人有声剧收录最全；需要 WebView |
 | 起点有声网 | www.qdysw.com | PTCMS | **95%** | 约 1.5 万本 |
 | 幻听网 | www.ting39.com | PTCMS | **95%** | 与 22ting.com（一夜幻听）同品牌，但没有 cloudflare 拦截 |
-| 乐听网 | www.leting.vip | PTCMS | **85%** | 约 1 万本 |
 | 听书吧 | www.ting8.cc | DedeCMS | **48%** | 书目约 2 万本，但音频烂掉不少；搜索需先过验证页 |
 | 乐听吧 | www.leting8.com | DedeCMS | **40%** | 与听书吧书目不重复，音频失效情况类似 |
 
@@ -71,12 +71,15 @@ org.gradle.java.home=/path/to/jdk-17
 
 站点改版或者写同类站时会用到：
 
-**PTCMS 系（起点/幻听/乐听）**
+**PTCMS 系（爱听书/起点/幻听）**
 
 - **guard 反爬要两个 cookie**：挑战页用 `Set-Cookie` 下发 `pt_browser_id`，混淆 js 里算出的 token 内容是 `IP|pt_browser_id|时间戳|hash`。只补 `pt_guid` 会一直拿到挑战页。
 - **音频地址分两段存**：`urlXXX` 是主体、`murlXXX` 是扩展名。有些线路给的主体不带扩展名，不接上 cdn 直接回 403。
 - **默认线路经常是空的**：player.html 的 `site` 参数是线路号，站点默认那条对不少章节返回空字符串，要换其它线路重试。
 - **章节目录页的 hash 每次请求都变**，不能写死，要从详情页的 `a.dirurl` 现取。
+- **反爬挑战的 cookie 名称各站不同**：起点系是 `pt_guid`，爱听书是 `__51guid__`，写法也不一样（一种先拼变量再赋值、一种直接赋值）。[PtcmsGuard](../CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/PtcmsGuard.kt) 从解开的脚本里自己读名称，所以一份逻辑吃两种站，站方改名也不用动代码。
+- **有的站拿 UA 当风控**：爱听书用 Chrome 77（repo 里 `testConfig` 写死的那个，2019 年）请求章节目录页直接回 429，而书籍页照样放行 —— 症状看起来完全像限流，查了半天才发现换个新 UA 就好。这类站要在源里指定 UA，不能依赖用户的 app 设置。
+- **限流要能分辨**：429 退避重试用尽后必须抛异常，不能把错误页当内容返回 —— 那样解析不到东西会变成"这本书没有章节"，把限流伪装成内容缺失。章节翻页时接住这个异常、保留已抓到的部分并提示用户。
 
 **DedeCMS 系（听书吧）**
 
@@ -97,6 +100,7 @@ org.gradle.java.home=/path/to/jdk-17
 
 原仓库里站点确认消失（域名过期停放、跳转广告页、DNS 无记录）的源已删除，对应测试也一并清掉：
 
+乐听网(leting.vip，与社区 ting29 订阅里的 LeTing 指向同一个站，两个源会让聚合搜索每本书出现两次)、
 幻听网(ting89)、六听网(6ting)、456听书(ting456)、听书宝(tingshubao)、声波FM(shengbo)、
 56听书(ting56)、静听网(audio698)、心魔听书(ixinmoo)、芒果听书(mgting)、中版有声(3eol)、
 爱听书(2uxs)、520听书(fushu520)、我爱听评书(tpsge)、麻辣听书(malatingshu)、有兔阅读(mituyuedu)、

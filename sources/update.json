@@ -1,7 +1,7 @@
 {
-    "version": 3,
+    "version": 4,
     "entry_package": "sources_by_cp",
     "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources/sources_by_cp.jar",
-    "update_msg": "听书吧、乐听吧的说明加上实测可播率(约四到五成)，站方音频失效较多，请留意。",
+    "update_msg": "新增爱听书(近年多人有声剧收录最全)。移除与 ting29 订阅重复的乐听网。",
     "support_url": "https://github.com/chiaping55/tingshu"
 }

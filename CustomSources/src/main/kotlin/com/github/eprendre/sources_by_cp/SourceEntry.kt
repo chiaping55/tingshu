@@ -23,10 +23,12 @@ object SourceEntry {
 
     @JvmStatic
     fun getSources(): List<TingShu> {
+        // 乐听网(leting.vip)已移除:社区 ting29 订阅里的 LeTing 指向同一个站，
+        // 两个源会让聚合搜索每本书出现两次。
         return listOf(
+            ITingShu,
             QiDianYouSheng,
             HuanTingWang39,
-            LeTingWang,
             TingShuBa,
             LeTingBa
         )
