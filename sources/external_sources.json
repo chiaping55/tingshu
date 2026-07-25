@@ -1,0 +1,7 @@
+{
+  "version": 4,
+  "entry_package": "sources_by_cp",
+  "download_url": "https://cdn.jsdelivr.net/gh/chiaping55/tingshu@master/sources/sources_by_cp.jar",
+  "update_msg": "新增爱听书。移除与 ting29 订阅重复的乐听网。",
+  "support_url": ""
+}
