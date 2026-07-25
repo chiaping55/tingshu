@@ -23,15 +23,31 @@ adb shell chmod 444 /sdcard/Android/data/com.github.eprendre.tingshu/files/jars/
 
 ## 包含的源
 
-| 源 | 站点 | 模板 | 备注 |
-|---|---|---|---|
-| 起点有声网 | www.qdysw.com | PTCMS | 约 1.5 万本 |
-| 幻听网 | www.ting39.com | PTCMS | 与 22ting.com（一夜幻听）同品牌，但没有 cloudflare 拦截 |
-| 乐听网 | www.leting.vip | PTCMS | 约 1 万本 |
-| 听书吧 | www.ting8.cc | DedeCMS | 资源量最大，玄幻一类就 127 页；搜索需先过站点验证页 |
-| 乐听吧 | www.leting8.com | DedeCMS | 与听书吧同模板但资源不重复；部分旧书音频已被站方删掉 |
+| 源 | 站点 | 模板 | 实测可播率 | 备注 |
+|---|---|---|---|---|
+| 起点有声网 | www.qdysw.com | PTCMS | **95%** | 约 1.5 万本 |
+| 幻听网 | www.ting39.com | PTCMS | **95%** | 与 22ting.com（一夜幻听）同品牌，但没有 cloudflare 拦截 |
+| 乐听网 | www.leting.vip | PTCMS | **85%** | 约 1 万本 |
+| 听书吧 | www.ting8.cc | DedeCMS | **48%** | 书目约 2 万本，但音频烂掉不少；搜索需先过验证页 |
+| 乐听吧 | www.leting8.com | DedeCMS | **40%** | 与听书吧书目不重复，音频失效情况类似 |
 
 音频全部是 mp3/m4a 直链，不需要 WebView，手表等设备也能用。
+
+### 可播率是怎么测的
+
+抽样跑「分类 → 详情 → 章节 → 实际下载一段字节」，只有 HTTP 2xx 且真的取到内容才算通过。
+DedeCMS 两站是从站方完整索引（`/xml/rss.xml`，各约 2 万笔）里**随机抽 25 本**，
+避免只抽连号书籍（同一批上传的书 CDN 会一起烂掉，会让数字失真）。
+
+两个 DedeCMS 站失效的原因是站方文件本身没了，不是解析逻辑的问题：
+失败集中在喜马拉雅旧 CDN（`audio.xmcdn.com` / `fdfs.xmcdn.com` 回 403/404）、
+蜻蜓 FM（`od.qingting.fm` 拒绝外部引用）、以及几个 DNS 已无记录的主机
+（`tingmp33.meiwenfen.com` / `miloli.info` / `kting.info`，本机与手机都解析不到）。
+
+试过但无效的救法，别再重复走一遍：
+补各种音质后缀（`-aacv2-48K` / `-64K` / `-ts-aacv2-48K` 等七种变体全 404）、
+URL 编码中文路径（主机本身连不上）、切换线路（`/play/{书}-{线路}-{集}` 的线路 1~4 全是空的，
+DedeCMS 只有单线路 —— 这点和 PTCMS 不同，PTCMS 的线路备援正是它能到 95% 的原因）。
 
 两套模板各自有基类（[PtcmsTingShu](../CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/PtcmsTingShu.kt) /
 [DedeCmsTingShu](../CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/DedeCmsTingShu.kt)），

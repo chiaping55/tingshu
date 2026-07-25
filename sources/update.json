@@ -1,7 +1,7 @@
 {
-    "version": 2,
+    "version": 3,
     "entry_package": "sources_by_cp",
     "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources/sources_by_cp.jar",
-    "update_msg": "新增乐听吧。修正喜马拉雅 storages 路径缺音质后缀导致 404 的问题。",
+    "update_msg": "听书吧、乐听吧的说明加上实测可播率(约四到五成)，站方音频失效较多，请留意。",
     "support_url": "https://github.com/chiaping55/tingshu"
 }
