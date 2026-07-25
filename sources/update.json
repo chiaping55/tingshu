@@ -1,7 +1,7 @@
 {
-    "version": 4,
-    "entry_package": "sources_by_cp",
-    "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources/sources_by_cp.jar",
-    "update_msg": "新增爱听书(近年多人有声剧收录最全)。移除与 ting29 订阅重复的乐听网。",
-    "support_url": "https://github.com/chiaping55/tingshu"
+  "version": 5,
+  "entry_package": "sources_by_cp",
+  "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources/sources_by_cp.jar",
+  "update_msg": "回退到已验证可用的版本(4个源，暂无爱听书)，用来确认订阅管道本身是通的。",
+  "support_url": "https://github.com/chiaping55/tingshu"
 }
