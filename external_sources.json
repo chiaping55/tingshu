@@ -1,0 +1,7 @@
+{
+  "version": 5,
+  "entry_package": "sources_by_cp",
+  "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp.jar",
+  "update_msg": "自维护听书源(起点有声网、幻听网、乐听网、听书吧、乐听吧)。",
+  "support_url": ""
+}
