@@ -27,7 +27,8 @@ object SourceEntry {
             QiDianYouSheng,
             HuanTingWang39,
             LeTingWang,
-            TingShuBa
+            TingShuBa,
+            LeTingBa
         )
     }
 }

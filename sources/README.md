@@ -29,6 +29,7 @@ adb shell chmod 444 /sdcard/Android/data/com.github.eprendre.tingshu/files/jars/
 | 幻听网 | www.ting39.com | PTCMS | 与 22ting.com（一夜幻听）同品牌，但没有 cloudflare 拦截 |
 | 乐听网 | www.leting.vip | PTCMS | 约 1 万本 |
 | 听书吧 | www.ting8.cc | DedeCMS | 资源量最大，玄幻一类就 127 页；搜索需先过站点验证页 |
+| 乐听吧 | www.leting8.com | DedeCMS | 与听书吧同模板但资源不重复；部分旧书音频已被站方删掉 |
 
 音频全部是 mp3/m4a 直链，不需要 WebView，手表等设备也能用。
 
@@ -66,6 +67,8 @@ org.gradle.java.home=/path/to/jdk-17
 - 音频明文写在播放页的 `var now="…"`，同页还有 `var next`（下一集），正则要区分开。
 - 新的喜马拉雅 cdn（`aod.cos.tx.xmcdn.com`）校验防盗链，不带 Referer 直接 403，旧的 `audio.xmcdn.com` 不校验 —— 用 `AudioUrlExtraHeaders` 补，并且要严格判断域名，否则会弄坏其它书源的音频请求。
 - 搜索接口有验证码闸（标题「系统安全验证」），实现 `ISearchVerification` 让 app 弹页面由用户自己过一次。
+- **`/storages/` 路径的文件名要带音质后缀**，站点给的地址有时漏掉，直接请求回 404，补上 `-aacv2-48K` 就能播。改写只在「storages 路径且没有后缀」时才做，所以不会弄坏本来可用的地址。剩下少量 403/404 是站方文件真的没了，换 Referer 也没用（五种 Referer 都试过）。
+- **这批域名大多是互为镜像的**：ting8.cc / ting69 / ting78 / 18ting / 79ting 内容一样，leting8 / ting17 是另一套。所以只挑了两套里各一个 —— 全加进去只会让聚合搜索每本书出现四次。哪个站挂了就把 baseUrl 换成同组的镜像顶上。
 
 **测试写法**
 

@@ -1,7 +1,7 @@
 {
-    "version": 1,
+    "version": 2,
     "entry_package": "sources_by_cp",
     "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources/sources_by_cp.jar",
-    "update_msg": "起点有声网、幻听网、乐听网、听书吧。音频均为直链，不需要 WebView。",
+    "update_msg": "新增乐听吧。修正喜马拉雅 storages 路径缺音质后缀导致 404 的问题。",
     "support_url": "https://github.com/chiaping55/tingshu"
 }

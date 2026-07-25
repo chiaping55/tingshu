@@ -45,8 +45,11 @@ abstract class DedeCmsTingShu : TingShu(), ISearchVerification, AudioUrlExtraHea
     /** 详情页的路径段，例如听书吧是 "mp3" */
     abstract val bookPath: String
 
-    /** 分类清单，pair 为 (分类id, 显示名) */
-    abstract val categories: List<Pair<String, String>>
+    /**
+     * 分类清单，pair 为 (分类id, 显示名)。
+     * 这批站的分类编号是一样的，默认给全套 24 个，站点有出入时再覆写。
+     */
+    open val categories: List<Pair<String, String>> = STANDARD_CATEGORIES
 
     override fun getUrl() = baseUrl
 
@@ -138,8 +141,19 @@ abstract class DedeCmsTingShu : TingShu(), ISearchVerification, AudioUrlExtraHea
      * next 是下一集，只取 now。
      */
     internal fun audioUrl(playPageHtml: String): String {
-        return Regex("""\bvar\s+now\s*=\s*"(https?://[^"]+)"""")
-            .find(playPageHtml)?.groupValues?.get(1) ?: ""
+        val url = Regex("""\bvar\s+now\s*=\s*"(https?://[^"]+)"""")
+            .find(playPageHtml)?.groupValues?.get(1) ?: return ""
+        return withQualitySuffix(url)
+    }
+
+    /**
+     * 喜马拉雅 /storages/ 下的文件名带音质后缀，站点给的地址有时漏掉，直接请求回 404。
+     * 实测补上 -aacv2-48K 就能播；地址本来就带后缀、或者不是 storages 路径的不动它，
+     * 所以这个改写只会救回原本失败的情况，不会弄坏已经可用的地址。
+     */
+    private fun withQualitySuffix(url: String): String {
+        if (!url.contains("/storages/") || url.contains("-aacv2-")) return url
+        return url.replace(Regex("""\.(m4a|mp3)$"""), "-aacv2-48K.$1")
     }
 
     /**
@@ -183,5 +197,33 @@ abstract class DedeCmsTingShu : TingShu(), ISearchVerification, AudioUrlExtraHea
         return maxOf(maxPage, currentPage)
     }
 
-    private fun textOf(element: Element?) = element?.text()?.trim() ?: ""
+    protected companion object {
+        /** 这批 DedeCMS 站共用的分类编号 */
+        val STANDARD_CATEGORIES = listOf(
+            "1" to "玄幻",
+            "2" to "言情",
+            "3" to "都市",
+            "7" to "武侠",
+            "10" to "穿越",
+            "11" to "科幻",
+            "12" to "网游",
+            "8" to "历史",
+            "9" to "军事",
+            "4" to "恐怖",
+            "5" to "惊悚",
+            "6" to "推理",
+            "13" to "评书",
+            "23" to "相声小品",
+            "14" to "戏曲",
+            "15" to "笑话",
+            "24" to "百家讲坛",
+            "16" to "儿童",
+            "17" to "财经",
+            "18" to "广播",
+            "19" to "诗歌",
+            "20" to "文学",
+            "21" to "粤语",
+            "22" to "经典"
+        )
+    }
 }
