@@ -31,12 +31,15 @@ https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.jso
 | 爱听书 | www.itingshu.net | PTCMS | 音频走 WebView，真机实测可播 |
 | 起点有声网 | www.qdysw.com | PTCMS | 95% |
 | 幻听网 | www.ting39.com | PTCMS | 95% |
+| 麒麟听书 | www.70ts.com | PTCMS | 实测可播(取址有频率限制，正常听不会碰到) |
 | ting15 | www.ting15.com | GXLCMS | 相声/曲艺/网文可播，评书那类境外连不上 |
 | 听书吧 | www.ting8.cc | DedeCMS | 48% |
 | 乐听吧 | www.leting8.com | DedeCMS | 40% |
 
 - [PtcmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/PtcmsTingShu.kt)
-  —— 处理 PTCMS 站群共有的 guard 反爬 cookie 握手、分页章节目录、音频地址拼接与线路重试
+  —— 处理 PTCMS 站群共有的 guard 反爬 cookie 握手、分页章节目录、音频地址拼接与线路重试。
+  同族站之间的差异做成了开关：章节目录在独立页还是书页本身、目录页走不走手机站、
+  换线路重试还是不支持、音频后缀取 murl 还是播放器里那段拼接
 - [DedeCmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/DedeCmsTingShu.kt)
   —— 处理 DedeCMS 站群的路径段差异、喜马拉雅 CDN 的防盗链与音质后缀
 - [GxlCmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/GxlCmsTingShu.kt)
@@ -65,6 +68,12 @@ https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.jso
   一本 2640 集的书显示成 1/10、播放位置全乱。宁可诚实报错。
 - **网络测试红了先读断言内容**：「解析出 0 集」是选择器问题，429 才是限流。
   这两个的表象很像，混淆了会往完全错误的方向查。
+- **判死站之前换一个出口复验**。麒麟听书一度从本机全部超时/502，看起来像后端挂了，
+  差点被判成死站；换条网络抓一次就是完整内容，而且书页比存档多了两页 —— 站一直在更新。
+  「我这里连不上」和「站没了」是两件事。
+- **别在被限流时做短间隔重试**。有的站取音频地址的冷却是分钟级的，一两秒后再要
+  只是多打两次请求、可能把冷却拖更久。提示要说清该怎么办("等一两分钟再点这一集")，
+  而不是笼统的"失败了"。
 - **测试别复制正式代码的选择器**，直接调正式的解析函数 —— 否则两边"一起错"就互相印证不出来。
 
 **测试会真的下载一段音频**验证能播，而不是只断言「拿到地址了」。基类把两个只有 app 才有实现的调用
