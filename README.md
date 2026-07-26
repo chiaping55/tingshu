@@ -6,7 +6,7 @@
 
 ## 快速開始
 
-在 app 裡 **源管理 → 訂閱 → 右上角添加**,貼上這個網址(結尾不要加斜線):
+在 app 裡 **源管理 → 訂閱 → 右上角添加**,貼上這個網址:
 
 ```
 https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.json
