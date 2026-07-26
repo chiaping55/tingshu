@@ -1,7 +1,7 @@
 {
-  "version": 10,
+  "version": 11,
   "entry_package": "sources_by_cp",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp.jar",
-  "update_msg": "爱听书：修好完整章节目录（v9 从手机站抓目录但认不得手机页的章节容器，会解析出 0 集）。",
+  "update_msg": "修好爱听书的章节列表：之前只给了详情页的最新几集，一本 2640 集的书会显示成 1/10、播放位置全乱。另外新增 ting15 源，补相声小品与曲艺戏曲这些别的源没有的品类。",
   "support_url": ""
 }

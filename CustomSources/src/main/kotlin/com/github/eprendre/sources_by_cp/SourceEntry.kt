@@ -30,7 +30,10 @@ object SourceEntry {
             QiDianYouSheng,
             HuanTingWang39,
             TingShuBa,
-            LeTingBa
+            LeTingBa,
+            // 第三个模板家族(GXLCMS)。加它是为了补品类而不是凑数量:
+            // 相声小品、曲艺戏曲这些上面几个源都没有，音频还是直链、不用 WebView。
+            Ting15
         )
     }
 }

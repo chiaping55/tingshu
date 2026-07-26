@@ -1,4 +1,5 @@
 import assertk.assertThat
+import assertk.assertions.contains
 import assertk.assertions.isEqualTo
 import assertk.assertions.isGreaterThan
 import assertk.assertions.isNotEmpty
@@ -40,9 +41,6 @@ class ITingShuTest {
             override val userAgent =
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-
-            /** 与 ITingShu 一致：限流紧，只要最新几集时不额外请求目录页 */
-            override val preferBookPageEpisodesWhenPartial = true
 
             /** 与 ITingShu 一致：章节目录走手机站，桌面站限流很紧 */
             override val episodeDirectoryBaseUrl = "https://m.itingshu.net"
@@ -150,10 +148,11 @@ class ITingShuTest {
         assertThat(detail.author).isNotEmpty()
         assertThat(detail.artist).isNotEmpty()
         assertThat(detail.coverUrl).isNotEmpty()
-        // 这个站限流紧，只要最新几集时用详情页自带的那一段（不请求目录页），
-        // 所以这里不断言"第一集在最前"——那是全量加载才成立的。
-        // 关键是目录页被限流时也要拿到章节、而不是抛异常让整个播放失败。
-        assertThat(detail.playList.size).isGreaterThan(0)
+        // 必须是目录页第一页（第1集起、正序、满 50 集），不能是详情页那"最新几集"——
+        // 那 10 集会被 app 当成整本书的播放列表：一本 2640 集的书显示成 1/10、
+        // 列表停在最后一页、播放位置全乱（用户实测踩到）。
+        assertThat(detail.playList.size).isGreaterThan(40)
+        assertThat(detail.playList.first().title).contains("第1集")
     }
 
     /**
