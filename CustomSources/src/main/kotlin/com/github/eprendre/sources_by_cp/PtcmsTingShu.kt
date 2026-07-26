@@ -15,6 +15,7 @@ import org.jsoup.Connection
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import java.io.IOException
 import java.net.URLEncoder
 import kotlin.random.Random
 
@@ -67,24 +68,31 @@ abstract class PtcmsTingShu : TingShu() {
     /** 同上，app 里弹提示；测试里覆写成打印即可 */
     protected open fun toast(message: String) = showToast(message)
 
-    private fun connect(url: String, referer: String?): Connection {
+    private fun connect(url: String, referer: String?, ua: String?): Connection {
         val connection = configure(Jsoup.connect(url))
-        userAgent?.let { connection.userAgent(it) }
+        (ua ?: userAgent)?.let { connection.userAgent(it) }
         if (referer != null) {
             connection.referrer(referer)
         }
         return connection
     }
 
-    internal fun fetch(url: String, referer: String? = null): Document =
-        guard.request { connect(url, referer) }.parse()
+    internal fun fetch(url: String, referer: String? = null, ua: String? = null): Document =
+        guard.request { connect(url, referer, ua) }.parse()
 
     internal fun fetchHtml(url: String, referer: String? = null): String =
-        guard.request { connect(url, referer) }.body()
+        guard.request { connect(url, referer, null) }.body()
 
     /** 有些站的搜索是 POST 表单 */
     internal fun fetchPost(url: String, data: Map<String, String>, referer: String? = null): Document =
-        guard.request { connect(url, referer).method(Connection.Method.POST).data(data) }.parse()
+        guard.request { connect(url, referer, null).method(Connection.Method.POST).data(data) }.parse()
+
+    /** 把目录页地址换到 [episodeDirectoryBaseUrl]（没设就原样返回） */
+    internal fun directoryPageUrl(dirUrl: String, page: Int): String {
+        val host = episodeDirectoryBaseUrl
+        val target = if (host == null) dirUrl else host + dirUrl.removePrefix(baseUrl)
+        return "$target?page=$page&sort=asc"
+    }
 
     /** 列表里书名带的固定后缀，子类需要时覆写，例如"有声小说" */
     protected open val titleSuffix: String = ""
@@ -97,6 +105,18 @@ abstract class PtcmsTingShu : TingShu() {
      * 这种站就在子类里指定一个较新的 UA，别依赖用户的设置。
      */
     protected open val userAgent: String? = null
+
+    /**
+     * 章节目录页改走这个域名，留 null 就用 [baseUrl]。
+     *
+     * 有的站桌面站限流很紧：爱听书那种一千多集的书目录有 27 页，连着翻就把额度用光，
+     * 接着连别的书的列表都读不出来。实测手机站是**独立额度**，所以把翻目录这种
+     * 请求量大的操作挪过去，桌面站的额度留给浏览用。
+     */
+    protected open val episodeDirectoryBaseUrl: String? = null
+
+    /** 上面那个域名要配的 UA */
+    protected open val episodeDirectoryUserAgent: String? = null
 
     /**
      * 翻章节目录时每页之间的等待区间。有的站限流比较严(爱听书连翻会回 429)，
@@ -149,7 +169,7 @@ abstract class PtcmsTingShu : TingShu() {
             if (dirUrl == null) {
                 episodes.addAll(parseEpisodes(doc).reversed())
             } else {
-                val firstPage = fetch("$dirUrl?page=1&sort=asc", bookUrl)
+                val firstPage = fetch(directoryPageUrl(dirUrl, 1), bookUrl, episodeDirectoryUserAgent)
                 episodes.addAll(parseEpisodes(firstPage))
                 val totalPage = parseEpisodeTotalPage(firstPage)
                 if (loadFullPages && totalPage > 1) {
@@ -159,7 +179,14 @@ abstract class PtcmsTingShu : TingShu() {
                         while (pageList.isNotEmpty()) {
                             val page = pageList.removeAt(0)
                             notifyLoading("$page / $totalPage")
-                            episodes.addAll(parseEpisodes(fetch("$dirUrl?page=$page&sort=asc", bookUrl)))
+                            val doc2 = fetch(directoryPageUrl(dirUrl, page), bookUrl, episodeDirectoryUserAgent)
+                            val pageEpisodes = parseEpisodes(doc2)
+                            // 站点被打太急时会回一个 200 的"访问过于频繁"页，解析不到章节。
+                            // 这种要当限流处理并停下，否则会把后面的页数都白跑一遍。
+                            if (pageEpisodes.isEmpty() && isThrottlePage(doc2)) {
+                                throw IOException("站点提示访问过于频繁")
+                            }
+                            episodes.addAll(pageEpisodes)
                             Thread.sleep(Random.nextLong(episodePageDelay.first, episodePageDelay.last))
                         }
                     } catch (e: Exception) {
@@ -243,6 +270,12 @@ abstract class PtcmsTingShu : TingShu() {
         }
     }
 
+    /** 站点限流时给的是 200 的提示页，不是 429 */
+    internal fun isThrottlePage(doc: Document): Boolean {
+        val text = doc.text()
+        return THROTTLE_HINTS.any { text.contains(it) }
+    }
+
     internal fun parseEpisodes(doc: Document): List<Episode> {
         return doc.select("div#playlist ul li a").map { Episode(it.text(), it.absUrl("href")) }
     }
@@ -282,6 +315,7 @@ abstract class PtcmsTingShu : TingShu() {
 
     protected companion object {
         private val AUDIO_SUFFIXES = listOf(".mp3", ".m4a", ".aac", ".m4s", ".wav")
+        private val THROTTLE_HINTS = listOf("过于频繁", "訪問過於頻繁", "稍后再试", "稍後再試")
 
         /**
          * 默认线路拿不到地址时依次尝试的线路号。

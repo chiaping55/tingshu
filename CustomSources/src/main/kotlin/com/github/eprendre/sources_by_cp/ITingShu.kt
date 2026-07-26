@@ -51,6 +51,18 @@ object ITingShu : PtcmsTingShu() {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
+    /**
+     * 章节目录走手机站。
+     *
+     * 一千多集的书目录有 27 页，连着翻桌面站就会 429，而且额度用光后连别的书的
+     * 列表都读不出来。实测手机站额度独立：同样连翻 8 页完全正常。
+     */
+    override val episodeDirectoryBaseUrl = "https://m.itingshu.net"
+
+    override val episodeDirectoryUserAgent =
+        "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
+
     /** 章节目录连着翻还是客气一点 */
     override val episodePageDelay = 400L..900L
 

@@ -1,7 +1,7 @@
 {
-  "version": 6,
+  "version": 7,
   "entry_package": "sources_by_cp",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp.jar",
-  "update_msg": "新增爱听书(近年多人有声剧收录最全，音频走 WebView 嗅探)。",
+  "update_msg": "爱听书的章节目录改走手机站，避免翻目录把桌面站额度用光、连别的书都读不出来。",
   "support_url": ""
 }

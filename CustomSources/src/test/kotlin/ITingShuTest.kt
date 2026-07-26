@@ -1,4 +1,5 @@
 import assertk.assertThat
+import assertk.assertions.isEqualTo
 import assertk.assertions.isGreaterThan
 import assertk.assertions.isNotEmpty
 import assertk.assertions.isTrue
@@ -39,6 +40,13 @@ class ITingShuTest {
             override val userAgent =
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+            /** 与 ITingShu 一致：章节目录走手机站，桌面站限流很紧 */
+            override val episodeDirectoryBaseUrl = "https://m.itingshu.net"
+
+            override val episodeDirectoryUserAgent =
+                "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 " +
+                    "(KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
 
             override fun getSourceId() = "5a1c8f24e7b3406d92fd7c05b1e8a367"
 
@@ -150,10 +158,29 @@ class ITingShuTest {
      * 不跑全量（这本有 27 页）—— 那样会触发站点限流，而限流本身已经在 PtcmsGuard 里
      * 退避重试、并在翻页时保留已抓到的部分处理过了。
      */
+    /**
+     * 换域名这段是纯字符串处理，单独测一次 —— 不依赖网络，所以站点限流时也验得准。
+     */
     @Test
-    fun secondEpisodePageLoads() {
+    fun directoryUrlGoesToMobileHost() {
+        val desktop = "https://www.itingshu.net/itingshus/ugRmCc/cbbhASafUAuaRqAa.html"
+        val page3 = source.directoryPageUrl(desktop, 3)
+        println("page3 = $page3")
+        assertThat(page3).isEqualTo(
+            "https://m.itingshu.net/itingshus/ugRmCc/cbbhASafUAuaRqAa.html?page=3&sort=asc"
+        )
+    }
+
+    @Test
+    fun secondEpisodePageLoadsFromMobileHost() {
         val dirUrl = bookPage.selectFirst("a.dirurl")!!.absUrl("href")
-        val secondPage = source.fetch("$dirUrl?page=2&sort=asc", SAMPLE_BOOK)
+        val target = source.directoryPageUrl(dirUrl, 2)
+        println("目录页地址 = $target")
+        // 必须换到手机站，桌面站连翻会 429 并且波及其它书的浏览
+        assertThat(target.startsWith("https://m.itingshu.net/")).isTrue()
+
+        val secondPage = source.fetch(target, SAMPLE_BOOK, "Mozilla/5.0 (Linux; Android 13) " +
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36")
         val episodes = secondPage.select("div#playlist ul li a")
         println("第2页章节 ${episodes.size} 集, 首集=${episodes.firstOrNull()?.text()}")
         assertThat(episodes.size).isGreaterThan(10)
