@@ -43,7 +43,10 @@ jobs:
 
       - name: 整理失敗清單
         if: failure()
-        run: python3 .github/scripts/summarize_failures.py CustomSources/build/test-results/test > failure-summary.md
+        run: |
+          python3 .github/scripts/summarize_failures.py CustomSources/build/test-results/test > failure-summary.md
+          # 一定要寫進 job summary:fork 預設關閉 Issues,那時這裡是唯一看得到結果的地方
+          cat failure-summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: 上傳完整測試報告
         if: always()
@@ -53,11 +56,20 @@ jobs:
           path: CustomSources/build/reports/tests/test/
           retention-days: 30
 
+      # Issues 在 fork 上預設是關的(倉庫 Settings → General → Features → Issues 可開啟)。
+      # 沒開就跳過,不要讓整個 job 因此變紅 —— 失敗詳情在上面的 job summary 裡,
+      # 而且排程工作流失敗時 GitHub 本來就會寄信給倉庫擁有者。
       - name: 開啟或更新 issue
         if: failure()
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
+            const repo = await github.rest.repos.get({ owner: context.repo.owner, repo: context.repo.repo });
+            if (!repo.data.has_issues) {
+              core.warning('倉庫未啟用 Issues,略過。失敗詳情見本次 run 的 Summary。');
+              return;
+            }
             const fs = require('fs');
             let body;
             try {
@@ -88,9 +100,12 @@ jobs:
 
       - name: 恢復時自動關 issue
         if: success()
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
+            const repo = await github.rest.repos.get({ owner: context.repo.owner, repo: context.repo.repo });
+            if (!repo.data.has_issues) return;
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner, repo: context.repo.repo,
               state: 'open', labels: 'health-check',
