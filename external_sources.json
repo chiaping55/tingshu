@@ -1,7 +1,7 @@
 {
-  "version": 17,
+  "version": 18,
   "entry_package": "sources_by_cp",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp.jar",
-  "update_msg": "书源介绍改成一句话说清楚:能听什么、遇到问题怎么办。",
+  "update_msg": "ting15 这个源改用站方的中文名「有听网」显示。",
   "support_url": ""
 }

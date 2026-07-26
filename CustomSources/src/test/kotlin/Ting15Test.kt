@@ -26,7 +26,7 @@ class Ting15Test {
 
             override fun getSourceId() = "7b4e91c6d8a3425fa07e2c5b39f1d846"
 
-            override fun getName() = "ting15"
+            override fun getName() = "有听网"
 
             override fun configure(connection: Connection): Connection = connection.testConfig(true)
 

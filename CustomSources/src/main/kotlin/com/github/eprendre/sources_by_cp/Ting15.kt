@@ -1,7 +1,9 @@
 package com.github.eprendre.sources_by_cp
 
 /**
- * ting15 有声小说 (www.ting15.com)
+ * 有听网 (www.ting15.com) —— 站方自称「有听网」，别和同族的**恋听网 ting55.com** 搞混，
+ * 那是另一个站(音频在 wting.info 上、实测全 404，所以没加)。
+ * 类名与文件名沿用 Ting15 以对应域名。
  *
  * GXLCMS 家族。加它的理由不是"再多一个源"，而是**补上现有源缺的品类** ——
  * 经典评书、曲艺戏曲、相声小品、家庭伦理这几类，PTCMS/DedeCMS 那批网文有声站基本没有，
@@ -40,7 +42,7 @@ object Ting15 : GxlCmsTingShu() {
 
     override fun getSourceId() = "7b4e91c6d8a3425fa07e2c5b39f1d846"
 
-    override fun getName() = "ting15"
+    override fun getName() = "有听网"
 
     override fun getDesc() = "推荐指数:3星 ⭐⭐⭐\n" +
         "武侠玄幻、都市言情书目最多；相声小品、曲艺戏曲是别的源少有的品类，但数量不多。\n" +
