@@ -1,0 +1,108 @@
+# 書源健康檢查
+#
+# 測試套件會對各站發真實請求(含真的下載一段音頻),所以定期跑一次
+# 就等於巡檢所有書源。源壞了自動開 issue,修好了自動關 —— 不用等到
+# 想聽的時候才發現源死了。
+#
+# 注意:GitHub runner 的出口是美國機房 IP,個別站點可能對機房 IP 更嚴。
+# 失敗時先手動 re-run 一次再下結論(issue 內文也會提醒)。
+name: health-check
+
+on:
+  schedule:
+    # 每週一 02:17 UTC(避開整點尖峰)。站點都是真實請求,別跑太勤。
+    - cron: '17 2 * * 1'
+  workflow_dispatch:
+  push:
+    # 工作流本身改動時跑一次,當作煙霧測試;平常的源碼推送不觸發
+    paths:
+      - '.github/workflows/health-check.yml'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: 跑真實請求測試
+        working-directory: CustomSources
+        run: |
+          chmod +x gradlew
+          ./gradlew test --no-daemon
+
+      - name: 整理失敗清單
+        if: failure()
+        run: python3 .github/scripts/summarize_failures.py CustomSources/build/test-results/test > failure-summary.md
+
+      - name: 上傳完整測試報告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: CustomSources/build/reports/tests/test/
+          retention-days: 30
+
+      - name: 開啟或更新 issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body;
+            try {
+              body = fs.readFileSync('failure-summary.md', 'utf8');
+            } catch (e) {
+              body = '(整理失敗清單時出錯,請直接看 workflow log)';
+            }
+            body += `\n\n---\n完整報告:[workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n\n` +
+              '> 提醒:GitHub runner 是美國機房 IP,失敗可能只是站點對機房 IP 限流。\n' +
+              '> 先 re-run 一次;連續兩週都紅才比較可能是源真的壞了。';
+            const title = '書源健康檢查失敗';
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'health-check',
+            });
+            if (issues.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issues[0].number,
+                body: `又一次失敗(${new Date().toISOString().slice(0,10)}):\n\n${body}`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title, body, labels: ['health-check'],
+              });
+            }
+
+      - name: 恢復時自動關 issue
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: 'open', labels: 'health-check',
+            });
+            for (const issue of issues) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `本次檢查全部通過(${new Date().toISOString().slice(0,10)}),自動關閉。`,
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: issue.number, state: 'closed',
+              });
+            }
