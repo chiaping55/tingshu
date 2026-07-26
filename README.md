@@ -1,115 +1,92 @@
-# 我的听书 — 自维护书源 fork
+# 我的听书 — 持續維護的書源訂閱
 
-这是 [eprendre/tingshu](https://github.com/eprendre/tingshu) 的 fork。上游已停止维护，
-官方的订阅端点 `wdts.top/api/sources/*.json` 现在全部返回 HTTP 526（源站证书失效），
-所以这里接手维护自己用的一份书源。
+[「我的听书」](https://github.com/eprendre/tingshu)是一款支援自訂書源的 Android 聽書 app。
+上游作者已停止維護,官方訂閱端點(`wdts.top`)也已失效 —— 如果你的書源大量斷掉、
+或重裝後加不回來,這個倉庫提供一份**持續維護中的替代訂閱**。
 
-**app 本身不在这个仓库里**，它是闭源的；这里只有「外置书源」的代码 —— app 启动时会从
-`/sdcard/Android/data/com.github.eprendre.tingshu/files/jars/` 加载 jar，所以不需要改 app 就能自己更新书源。
+## 快速開始
 
-## 订阅地址
-
-app 里 **源管理 → 订阅 → 右上角添加**，粘贴（结尾不要加斜杠）：
+在 app 裡 **源管理 → 訂閱 → 右上角添加**,貼上這個網址(結尾不要加斜線):
 
 ```
 https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.json
 ```
 
-包含的源、实测可播率、以及踩过的坑都记在 [sources/README.md](sources/README.md)。
+添加後 app 每次啟動會自動檢查更新,書源修復或新增時不需要任何手動操作。
+
+## 目前包含的書源
+
+| 書源 | 站點 | 特點與注意事項 |
+|---|---|---|
+| 爱听书 | itingshu.net | 近年多人有聲劇收錄最全。音頻靠 WebView 嗅探,開播放頁會慢幾秒,手錶等無 WebView 裝置不能用 |
+| 起点有声网 | qdysw.com | 實測可播率 95%,音頻直鏈 |
+| 幻听网 | ting39.com | 實測可播率 95%,音頻直鏈 |
+| 麒麟听书 | 70ts.com | 書多、更新勤,片源在蜻蜓FM(和其他源不同,同一本書可能是另一個演播版本)。連續快速跳集會暫時取不到音頻,等一兩分鐘即可,不是源壞了 |
+| ting15 | ting15.com | 補相聲小品、曲藝戲曲這些其他源沒有的品類。經典評書那一類的音頻伺服器在境外連不上(境內正常) |
+| 听书吧 | ting8.cc | 實測可播率約 48%,部分音頻已失效 |
+| 乐听吧 | leting8.com | 實測可播率約 40%,部分音頻已失效 |
+
+挑選書源的標準是**「能不能聽到想聽的書」**:優先修可播率高的站、補其他源沒有的內容品類,
+而不是把同樣的網文有聲重複收錄一遍。可播率都是真實抽測(實際下載音頻位元組),不是估的。
+
+除爱听书外,所有書源的音頻都是 mp3/m4a 直鏈,不需要 WebView,手錶等裝置也能用。
+
+**遇到問題?** 「載入出錯」多半是站點暫時限流,過幾分鐘重進即可;某一集播不出來就換一集試試。
+確定是書源壞了(整個源都打不開、持續數天)歡迎開 issue 回報。
 
 ---
 
-## 这个 fork 改了什么
+## 給想自己寫書源的人
 
-### 加了什么
+這個 fork 除了訂閱檔,也整理了一套比上游範例更省力的寫源框架,程式碼都在
+[CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/)。
 
-**新的源包 `sources_by_cp`**（[CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/)），
-5 个源按站点模板分成两个基类，加同模板的站点只需要填 baseUrl 和路径段：
+### 按建站模板抽成基類
 
-| 源 | 站点 | 模板 | 实测可播率 |
-|---|---|---|---|
-| 爱听书 | www.itingshu.net | PTCMS | 音频走 WebView，真机实测可播 |
-| 起点有声网 | www.qdysw.com | PTCMS | 95% |
-| 幻听网 | www.ting39.com | PTCMS | 95% |
-| 麒麟听书 | www.70ts.com | PTCMS | 实测可播(取址有频率限制，正常听不会碰到) |
-| ting15 | www.ting15.com | GXLCMS | 相声/曲艺/网文可播，评书那类境外连不上 |
-| 听书吧 | www.ting8.cc | DedeCMS | 48% |
-| 乐听吧 | www.leting8.com | DedeCMS | 40% |
+中文聽書站大多用同一批建站程式架的,同一模板的站點只差域名和路徑。這裡把三個常見模板
+各抽成一個基類,**加同族站點只需要填 baseUrl、分類代號和 sourceId**:
 
 - [PtcmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/PtcmsTingShu.kt)
-  —— 处理 PTCMS 站群共有的 guard 反爬 cookie 握手、分页章节目录、音频地址拼接与线路重试。
-  同族站之间的差异做成了开关：章节目录在独立页还是书页本身、目录页走不走手机站、
-  换线路重试还是不支持、音频后缀取 murl 还是播放器里那段拼接
+  —— PTCMS 站群。處理反爬 cookie 握手、分頁章節目錄、音頻地址拼接與線路重試。
+  同族站之間的差異做成開關:章節目錄在獨立頁還是書頁本身、目錄頁走不走手機站、
+  支不支援換線路、音頻後綴取 murl 還是播放器裡那段拼接
 - [DedeCmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/DedeCmsTingShu.kt)
-  —— 处理 DedeCMS 站群的路径段差异、喜马拉雅 CDN 的防盗链与音质后缀
+  —— DedeCMS(織夢)站群。處理路徑段差異、喜馬拉雅 CDN 的防盜鏈與音質後綴
 - [GxlCmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/GxlCmsTingShu.kt)
-  —— GXLCMS 家族。音频靠 POST 换 JSON 拿直链，处理 unicode 转义还原、非 ASCII 路径的
-  百分号编码、以及取址接口的 status 语义(限流/缺章/付费要分清)
+  —— GXLCMS 家族。音頻靠 POST 換 JSON 拿直鏈,處理 unicode 轉義還原、非 ASCII 路徑的
+  百分號編碼,以及取址接口的狀態語義(限流/缺章/付費要分清)
 
-加 ting15 的理由是**补品类而不是凑数量** —— 相声小品、曲艺戏曲这些前面几个源都没有。
-挑源的标准是"能不能听到想听的书"，同样的网文有声再重复一遍没有意义。
+### 測試跑的是正式解析程式碼
 
-除爱听书外，音频都是 mp3/m4a 直链、`isWebViewNotRequired = true`，手表等没有 WebView 的设备也能用；
-爱听书的真实地址由被商业混淆的 player js 生成，只能靠 WebView 嗅探，所以那个源需要 WebView。
+基類把兩個只有 app 內才有實作的呼叫(`config()` / `notifyLoadingEpisodes()`)包成可覆寫方法,
+所以單元測試直接跑正式的解析邏輯,不必像上游範例那樣在測試裡複製一份。
+音頻相關的測試會**真的下載一段位元組**驗證能播 —— 「拿到地址了」和「播得出來」是兩回事,
+好幾個站的地址要補簽名參數或後綴,只斷言非空完全測不出來。
 
-**发布用的订阅文件在仓库根目录**：[external_sources.json](external_sources.json) 与编译好的
-[sources_by_cp.jar](sources_by_cp.jar)，改完源更新版本号，app 下次启动自动更新。
+### 訂閱檔的擺放規則(重要)
 
-这两个文件必须放在同一层，**不能收进子目录** —— app 不照 `download_url` 抓 jar，
-而是按订阅 json 所在的位置推算同目录下的 `<entry_package>.jar`。
-一开始放在 `sources/` 底下，加订阅一直报「外部源载入失败」，换主机、换 MIME、
-换 jar 内容都不是原因，挪到根目录就立刻成功了。详情见 [sources/README.md](sources/README.md)。
+`external_sources.json` 和編譯好的 `sources_by_cp.jar` 必須放在**同一層目錄**
+(這個倉庫放在根目錄)。app 並不按 JSON 裡的 `download_url` 抓 jar,而是按訂閱 JSON
+所在的位置推算同目錄下的 `<entry_package>.jar` —— 放進子目錄訂閱會一直報
+「外部源載入失敗」,而且錯誤訊息完全看不出原因。
 
-**几个值得记下来的坑**（详情见 [sources/README.md](sources/README.md)）：
+### 建置環境
 
-- **别用 Java 21 的 `List.reversed()`** 这类 SequencedCollection 方法 —— 安卓上不存在，
-  而且和 Kotlin 同名扩展函数撞车，本机 JVM 测试可能一起通过，等于埋雷。用 `asReversed()`。
-- **别拿"最新几集"当播放列表**：详情页自带的那 10 集交给 app，app 会当成整本书 ——
-  一本 2640 集的书显示成 1/10、播放位置全乱。宁可诚实报错。
-- **网络测试红了先读断言内容**：「解析出 0 集」是选择器问题，429 才是限流。
-  这两个的表象很像，混淆了会往完全错误的方向查。
-- **判死站之前换一个出口复验**。麒麟听书一度从本机全部超时/502，看起来像后端挂了，
-  差点被判成死站；换条网络抓一次就是完整内容，而且书页比存档多了两页 —— 站一直在更新。
-  「我这里连不上」和「站没了」是两件事。
-- **别在被限流时做短间隔重试**。有的站取音频地址的冷却是分钟级的，一两秒后再要
-  只是多打两次请求、可能把冷却拖更久。提示要说清该怎么办("等一两分钟再点这一集")，
-  而不是笼统的"失败了"。
-- **测试别复制正式代码的选择器**，直接调正式的解析函数 —— 否则两边"一起错"就互相印证不出来。
+- **需要 JDK 17**(gradle 8.0 的 daemon 只支援 JDK 8–19,新機常見的 JDK 21+ 會直接失敗)。
+  預設 JDK 不是 17 時,在 `~/.gradle/gradle.properties` 加 `org.gradle.java.home=/path/to/jdk-17`
+- 倉庫源已改回 `mavenCentral()`(原本配的阿里雲舊路徑已改版、jcenter 已停服)
+- bytecode 鎖定 Java 8 —— 倉庫自帶的 d8 認不得新版 class file,**也別用 Java 21 才有的
+  API**(如 `List.reversed()`),Android 上不存在,而且會和 Kotlin 同名擴充函式撞名,
+  本機測試照樣通過、上了手機才崩
+- 建置:`./gradlew jar`,產物在 `build/libs/sources_by_cp.jar`
 
-**测试会真的下载一段音频**验证能播，而不是只断言「拿到地址了」。基类把两个只有 app 才有实现的调用
-（`config()` / `notifyLoadingEpisodes()`）包成可覆写方法，所以单元测试跑的是正式解析代码本身，
-不是像上游那样在测试里复制一份逻辑。
+更多維護筆記(各站反爬型態、限流行為、除錯教訓)在 [sources/README.md](sources/README.md)。
 
-### 清了什么
+### 相對上游的其他變更
 
-删掉了 **18 个源 + 17 个测试**，都是站点确认消失的（域名过期停放、跳转广告页、DNS 无记录）：
-
-- 听书源（15）：幻听网(ting89)、六听网(6ting)、456听书(ting456)、听书宝(tingshubao)、
-  声波FM(shengbo)、56听书(ting56)、静听网(audio698)、心魔听书(ixinmoo)、芒果听书(mgting)、
-  中版有声(3eol)、爱听书(2uxs)、520听书(fushu520)、我爱听评书(tpsge)、麻辣听书(malatingshu)、
-  有兔阅读(mituyuedu)
-- 视频源（3）：九州影视(unss)、南瓜影视(nangua55)、樱花动漫(yinghuacd)
-- 测试：上述源的测试，加上 7 个站点还活着但页面已改版、跑起来一直红的旧测试
-  （海洋听书、洛奇Town、经典老歌、机核、酷我、声音巴士、云图有声 —— 源代码保留了，只删测试）
-
-判断标准不是「本机连不上」，而是从**手机端实测 DNS** 再比对域名停放主机的 IP。
-例如 `unss.net` 解析到 `208.98.40.223`，那是 4.cn 域名拍卖站的主机，所以判定为停放；
-反过来海洋听书、口袋微课堂、听中国、聚听网从手机能正常解析，就保留了 —— 有些站只是屏蔽境外 IP。
-
-清理后 `./gradlew test` 全部通过，不再有一堆红字盖掉真正的问题。
-
-### 修了什么
-
-构建在 2026 年的新环境上跑不起来，改了三处（[CustomSources/build.gradle](CustomSources/build.gradle)）：
-
-- 仓库源改回 `mavenCentral()` —— 原本配的阿里云旧 nexus 路径已改版、jcenter 2021 年就停服了
-- 去掉 `jvmToolchain(18)` —— JDK 18 已 EOL，而且 settings.gradle 没装 foojay resolver，
-  gradle 不会自动下载工具链，会直接报 no matching toolchain
-- 锁定 Java 8 bytecode —— 仓库自带的 d8 认不了新版 class file
-
-**跑 gradle 需要 JDK 17**（gradle 8.0 的 daemon 只支持 JDK 8–19，新机常见的 JDK 21+ 会直接失败）。
-本机默认 JDK 不是 17 时，在 `~/.gradle/gradle.properties` 里加 `org.gradle.java.home=/path/to/jdk-17`。
-下面上游教程里写的「安装 jdk18」按现在的情况读作 JDK 17 即可。
+清掉了 18 個站點已確認消失的失效源和 17 個一直紅的舊測試,`./gradlew test` 保持全綠。
+判斷「站是否消失」不看單一網路能不能連上,而是比對 DNS 解析與域名停放主機的 IP,
+並換出口複驗 —— 有些站只是封鎖境外 IP 或暫時故障,「我這裡連不上」不等於「站沒了」。
 
 ---
 
