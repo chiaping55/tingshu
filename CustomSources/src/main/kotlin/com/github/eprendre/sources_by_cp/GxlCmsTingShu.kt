@@ -16,6 +16,7 @@ import org.jsoup.Connection
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.io.IOException
+import java.net.URLEncoder
 
 /**
  * GXLCMS 听书站群通用基类(恋听网一系)。
@@ -82,12 +83,48 @@ abstract class GxlCmsTingShu : TingShu(), AudioUrlExtraHeaders {
         )
     }
 
+    /**
+     * 搜索第 1 页是 POST，**第 2 页起是 GET**，见 [searchPageUrl]。
+     *
+     * 原本这里写死「搜索结果不分页，固定回 1 页」—— 那是错的，站方分页栏就有「尾页」。
+     * 实测搜「天」有 14 页(约 140 笔)，而使用者只拿得到前 10 笔。
+     * 同样的错在爱听书那个源上也犯过一次:**别假设搜索不分页，去看分页栏**。
+     */
     override fun search(keywords: String, page: Int): Pair<List<Book>, Int> {
-        val doc = connect("$baseUrl$searchPath", "$baseUrl/")
-            .method(Connection.Method.POST)
-            .data("wd", keywords)
-            .post()
-        return Pair(parseBooks(doc), 1)// 搜索结果不分页
+        val doc = if (page <= 1) {
+            connect("$baseUrl$searchPath", "$baseUrl/")
+                .method(Connection.Method.POST)
+                .data("wd", keywords)
+                .post()
+        } else {
+            fetch(searchPageUrl(keywords, page), "$baseUrl/")
+        }
+        return Pair(parseBooks(doc), parseSearchTotalPage(doc, page))
+    }
+
+    /**
+     * 搜索第 2 页起的地址。ting15 形如 `/?s=ting-search-wd-{关键词}-p-{页码}.html`。
+     * 同族的恋听网路由不同，所以做成可覆写。
+     */
+    protected open fun searchPageUrl(keywords: String, page: Int): String =
+        "$baseUrl/?s=ting-search-wd-${URLEncoder.encode(keywords, "UTF-8")}-p-$page.html"
+
+    /** 给测试用:searchPageUrl 是 protected */
+    internal fun searchPageUrlForTest(keywords: String, page: Int) = searchPageUrl(keywords, page)
+
+    /**
+     * 搜索结果的总页数。
+     *
+     * **不能重用 [parseTotalPage]** —— 那个认的是分类页的 `/index{N}.html`，
+     * 而搜索页的分页链接长得完全不同(`-p-{N}.html`)，套上去会一页都找不到。
+     */
+    internal fun parseSearchTotalPage(doc: Document, currentPage: Int): Int {
+        val maxPage = doc.select("div.c-page a")
+            .mapNotNull {
+                Regex("""-p-(\d+)\.html""").find(it.attr("href"))?.groupValues?.get(1)?.toIntOrNull()
+            }
+            .maxOrNull() ?: return currentPage
+        return maxOf(maxPage, currentPage)
     }
 
     override fun getCategoryList(url: String): Category {

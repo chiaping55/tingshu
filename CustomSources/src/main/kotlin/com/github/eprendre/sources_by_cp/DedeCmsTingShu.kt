@@ -123,10 +123,21 @@ abstract class DedeCmsTingShu : TingShu(), ISearchVerification {
         bookUrl: String,
         loadEpisodes: Boolean,
         loadFullPages: Boolean
-    ): BookDetail {
-        val doc = fetch(bookUrl, "$baseUrl/")
+    ): BookDetail = parseDetail(fetch(bookUrl, "$baseUrl/"))
+
+    /** 给测试用:把解析和取页面分开，才能拿本地 html 验证选择器而不发网络 */
+    internal fun parseDetailForTest(doc: Document) = parseDetail(doc, loadEpisodes = true)
+
+    private fun parseDetail(doc: Document, loadEpisodes: Boolean = true): BookDetail {
         val coverUrl = doc.selectFirst("span.img-box img")?.absUrl("src") ?: ""
-        val descriptionText = doc.select("p.f-gray").joinToString(" ") { it.text() }
+        // **只看本书自己那一块**。整页有 27 个 p.f-gray，本书只占 3 个，其余全是侧栏推荐；
+        // 原本 select("p.f-gray") 全抓来串成一行，于是 `内容介绍[：:](.*)` 的 `.*`
+        // 一路吃到字符串结尾 —— 每本书的简介尾巴都黏上「超品相师作者：…，由…播音」
+        // 这类侧栏文案(实测两站 12 本全中)。作者/播音的 regex 跑在同一个字符串上，
+        // 现在靠"本书的 credits 排在最前面"才对，某本书自己那段不符 pattern 时
+        // 会静静抓到侧栏第一本推荐书的作者 —— 变成错资料而不是空值，那更难发现。
+        val infoBlock = doc.selectFirst("div.style-img") ?: doc.body()
+        val descriptionText = infoBlock.select("p.f-gray").joinToString(" ") { it.text() }
         val intro = Regex("内容介绍[：:](.*)").find(descriptionText)?.groupValues?.get(1)?.trim()
             ?: descriptionText
         // 站点这段 html 里 <a> 是坏的嵌套，从文字里取比选择器可靠
@@ -136,7 +147,8 @@ abstract class DedeCmsTingShu : TingShu(), ISearchVerification {
 
         val episodes = if (loadEpisodes) {
             doc.select("div#yuedu ul.ul-36 li a").map {
-                Episode(it.attr("title").ifEmpty { it.text() }, it.absUrl("href"))
+                // title 属性要 trim —— 站方有些书整本的章节名都带尾 tab(实测 1089 集全带)
+                Episode(it.attr("title").trim().ifEmpty { it.text().trim() }, it.absUrl("href"))
             }
         } else {
             emptyList()
@@ -215,9 +227,16 @@ abstract class DedeCmsTingShu : TingShu(), ISearchVerification {
         }
     }
 
-    /** 带音质后缀的那个变体；本来就带后缀、或不是 storages 路径就返回 null(没有别的变体可试) */
+    /**
+     * 带音质后缀的那个变体；本来就带后缀就返回 null(没有别的变体可试)。
+     *
+     * **不要限制在 `/storages/` 路径。** 原本只对 storages 路径生成这个候选，
+     * 实测 `group75/M09/8F/AC/wKgO3V6SuBrysbuSAEGnDInNYiU675.m4a` 这种老路径
+     * 原地址 404、补上后缀 206 能播 —— 那道守卫等于一次都不试就放弃。
+     * 反正 [pickPlayable] 会先试原地址，多一个候选只在原地址失败时多打一个探测请求。
+     */
     private fun withQualitySuffix(url: String): String? {
-        if (!url.contains("/storages/") || url.contains("-aacv2-")) return null
+        if (url.contains("-aacv2-")) return null
         val suffixed = url.replace(Regex("""\.(m4a|mp3)$"""), "-aacv2-48K.$1")
         return if (suffixed == url) null else suffixed
     }

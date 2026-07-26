@@ -185,4 +185,37 @@ class Ting15Test {
         }
         assertThat(threw).isTrue()
     }
+
+    /**
+     * 搜索**有分页** —— 原本写死回 1 页，使用者只拿得到前 10 笔。
+     *
+     * 实测搜「天」有 14 页(约 140 笔)。而且搜索页的分页链接形式和分类页完全不同
+     * (`-p-{N}.html` vs `/index{N}.html`)，所以不能重用 parseTotalPage ——
+     * 套错的话一页都找不到、又退回「只有 1 页」。
+     * 纯字符串处理，不依赖网络，所以站点限流时也验得准。
+     */
+    @Test
+    fun searchPaginationIsReadFromItsOwnLinkShape() {
+        val html = """
+            <div class="c-page">
+              <span class="current">1</span>
+              <a data="p-2" href="?s=ting-search-wd-%E5%A4%A9-p-2.html">2</a>
+              <a data="p-14" href="?s=ting-search-wd-%E5%A4%A9-p-14.html">尾页</a>
+            </div>
+        """.trimIndent()
+        val doc = org.jsoup.Jsoup.parse(html)
+        assertThat(source.parseSearchTotalPage(doc, 1)).isEqualTo(14)
+        // 分类页那套正则配不上搜索页的链接，会退回当前页 —— 这就是不能重用的理由
+        assertThat(source.parseTotalPage(doc, 1)).isEqualTo(1)
+    }
+
+    /** 搜索翻页地址的组装 */
+    @Test
+    fun searchPageUrlShape() {
+        val url = source.searchPageUrlForTest("天", 2)
+        println("第2页 = $url")
+        assertThat(url).isEqualTo(
+            "https://www.ting15.com/?s=ting-search-wd-%E5%A4%A9-p-2.html"
+        )
+    }
 }

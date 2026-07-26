@@ -112,15 +112,16 @@ class DedeCmsSourcesTest {
 
     /**
      * 没有别的变体可试时不该浪费一个探测请求 —— 每集都多打一次是有代价的。
+     *
+     * 「没有别的变体」现在只剩一种情况：地址本来就带 `-aacv2-48K`。
+     * (原本还包括「不是 /storages/ 路径」，但那道守卫已经拿掉 ——
+     *  实测 group75/… 这种老路径原地址 404、补后缀 206 能播，
+     *  守着它等于一次都不试就放弃。见 suffixCandidateIsTriedOnNonStoragesPathsToo。)
      */
     @Test
     fun doesNotProbeWhenThereIsNoAlternative() {
         val probed = ArrayList<String>()
         val site = probeSite { probed.add(it); true }
-        // group 路径不适用音质后缀
-        val group = "http://aod.cos.tx.xmcdn.com/group75/M09/99/AAA.m4a"
-        assertThat(site.pickPlayable(group)).isEqualTo(group)
-        // 本来就带后缀了
         val already = "https://aod.cos.tx.xmcdn.com/storages/1a11-x/12/D1/AAA-aacv2-48K.m4a"
         assertThat(site.pickPlayable(already)).isEqualTo(already)
         assertThat(probed.isEmpty()).isTrue()
@@ -155,5 +156,55 @@ class DedeCmsSourcesTest {
         val sampled = minOf(titles[0].size, titles[1].size)
         println("重复: ${overlap.size} / $sampled 本")
         assertThat(overlap.size < sampled - 1).isTrue()
+    }
+
+    /**
+     * 简介只能取本书自己那一段，不能把侧栏推荐吃进来。
+     *
+     * 详情页有 27 个 p.f-gray，本书只占 3 个 —— 原本全抓来串成一行，
+     * `内容介绍[：:](.*)` 的 `.*` 就一路吃到结尾，每本书的简介尾巴都黏上
+     * 「XXX作者：…，由…播音」这类侧栏文案(实测两站 12 本全中)。
+     */
+    @Test
+    fun introDoesNotSwallowSidebarRecommendations() {
+        val html = """
+            <div class="tx-box mb10"><div class="style-img clearfix pd10">
+              <div class="img-100"><span class="img-box"><img src="/cover.jpg"></span></div>
+              <section>
+                <h1 class="style-title">最狂战神</h1>
+                <p class="mb10 f-12 f-gray"><a href="#">竟然先生</a> <span>已完结</span></p>
+                <p class="f-gray mb10">最狂战神作者：<a href="#">竟然先生</a>，由<a href="#">我本王少</a>播音，听书吧提供收听平台。</p>
+                <p class="f-gray mb10">内容介绍：他，是西北战王，守护夏国山河以北。</p>
+              </section>
+            </div></div>
+            <div class="side">
+              <p class="f-gray">超品相师作者：九灯和善，由大音希声播音。</p>
+              <p class="f-gray">百炼飞升录作者：青阳小栈，由某某播音。</p>
+            </div>
+            <div id="yuedu"><ul class="ul-36"><li><a href="/play/1-0-0.html" title="第001集	">第001集</a></li></ul></div>
+        """.trimIndent()
+        val site = probeSite { true }
+        val detail = site.parseDetailForTest(org.jsoup.Jsoup.parse(html))
+        println("简介=${detail.intro}")
+        println("作者=${detail.author} 演播=${detail.artist}")
+        assertThat(detail.intro).isEqualTo("他，是西北战王，守护夏国山河以北。")
+        assertThat(detail.author).isEqualTo("竟然先生")
+        assertThat(detail.artist).isEqualTo("我本王少")
+        // 章节名要 trim —— 站方有些书整本都带尾 tab
+        assertThat(detail.playList.single().title).isEqualTo("第001集")
+    }
+
+    /**
+     * 音质后缀候选**不该限制在 /storages/ 路径**。
+     *
+     * 实测 group75/… 这种老路径原地址 404、补后缀 206 能播，
+     * 而原本那道守卫让它一次都不试就放弃。
+     */
+    @Test
+    fun suffixCandidateIsTriedOnNonStoragesPathsToo() {
+        val plain = "http://aod.cos.tx.xmcdn.com/group75/M09/8F/AC/wKgO3V6SuBrysbuSAEGnDInNYiU675.m4a"
+        val suffixed = plain.replace(".m4a", "-aacv2-48K.m4a")
+        // 只有带后缀的能播 -> 必须选它(旧版会直接回原地址、根本不试)
+        assertThat(probeSite { it == suffixed }.pickPlayable(plain)).isEqualTo(suffixed)
     }
 }
