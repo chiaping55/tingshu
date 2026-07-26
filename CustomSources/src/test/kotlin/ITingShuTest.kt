@@ -185,8 +185,16 @@ class ITingShuTest {
 
         val secondPage = source.fetch(target, SAMPLE_BOOK, "Mozilla/5.0 (Linux; Android 13) " +
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36")
-        val episodes = secondPage.select("div#playlist ul li a")
-        println("第2页章节 ${episodes.size} 集, 首集=${episodes.firstOrNull()?.text()}")
+        // 直接用正式代码解析，不在测试里复制选择器 —— 手机站的容器和桌面站不同
+        // (ol.novel-text-list vs div#playlist)，测试自带选择器的话正式代码错了也测不出来
+        val episodes = source.parseEpisodes(secondPage)
+        println("第2页章节 ${episodes.size} 集, 首集=${episodes.firstOrNull()?.title}")
         assertThat(episodes.size).isGreaterThan(10)
+        // 手机站章节名带 .mp3 尾巴，要去掉
+        assertThat(episodes.none { it.title.endsWith(".mp3") }).isTrue()
+        // 总页数从手机站的"选集"弹窗取，认不得会算成 1，全量加载就只剩 50 集
+        val totalPage = source.parseEpisodeTotalPage(secondPage)
+        println("总页数 = $totalPage")
+        assertThat(totalPage).isGreaterThan(20)
     }
 }

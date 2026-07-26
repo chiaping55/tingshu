@@ -1,7 +1,7 @@
 {
-  "version": 9,
+  "version": 10,
   "entry_package": "sources_by_cp",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp.jar",
-  "update_msg": "修掉 v8 会在安卓上崩溃的 List.reversed()(那是 Java 21 才有的方法)。请更新到这一版。",
+  "update_msg": "爱听书：修好完整章节目录（v9 从手机站抓目录但认不得手机页的章节容器，会解析出 0 集）。",
   "support_url": ""
 }

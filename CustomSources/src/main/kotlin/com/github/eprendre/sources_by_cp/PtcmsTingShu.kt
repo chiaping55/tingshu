@@ -297,14 +297,25 @@ abstract class PtcmsTingShu : TingShu() {
     }
 
     internal fun parseEpisodes(doc: Document): List<Episode> {
-        return doc.select("div#playlist ul li a").map { Episode(it.text(), it.absUrl("href")) }
+        // 桌面站的容器是 div#playlist ul，手机站(m.xxx)是 ol.novel-text-list —— 目录翻页
+        // 走手机站时必须认得后者，不然会解析出 0 集、把限流降级那条路整个废掉。
+        var links = doc.select("div#playlist ul li a")
+        if (links.isEmpty()) {
+            links = doc.select("ol.novel-text-list li a")
+        }
+        // 手机站的章节名带 ".mp3" 尾巴，桌面站没有；去掉才不会同一本书两种名字
+        return links.map { Episode(it.text().removeSuffix(".mp3"), it.absUrl("href")) }
     }
 
     /**
      * 章节目录页的"快速选集"每一项对应一页(1~50、51~100…)，数量就是总页数。
+     * 桌面站是 ul.js_chapter_ul，手机站是弹窗 div.pt-dir-sel。
      */
     internal fun parseEpisodeTotalPage(doc: Document): Int {
-        val chunks = doc.select("ul.js_chapter_ul > li").size
+        var chunks = doc.select("ul.js_chapter_ul > li").size
+        if (chunks == 0) {
+            chunks = doc.select("div.pt-dir-sel ul > li").size
+        }
         return if (chunks > 0) chunks else 1
     }
 
