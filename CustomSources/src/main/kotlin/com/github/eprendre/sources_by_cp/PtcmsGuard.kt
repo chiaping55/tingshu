@@ -16,8 +16,10 @@ import java.net.URLEncoder
  * 而是把脚本里的变量声明和 cookie 赋值都解出来自己对应 —— 同一份逻辑就能吃两种站，
  * 站方哪天改名也不用改代码。
  *
- * 挑战页还会用 Set-Cookie 下发一个 id（如 `pt_browser_id`），而 token 就是用它算出来的，
- * 所以两边的 cookie 都要带上，只补 token 那个会一直拿到挑战页。
+ * 挑战页有时还会用 Set-Cookie 下发一个 id（起点系是 `pt_browser_id`），token 是用它算出来的，
+ * 所以两边的 cookie 都要带上。**但各站不一样**：爱听书 2026-07 复验时只下发一个
+ * `server_name_session`（后端节点值），完全不带它、只带解出来的 token 照样拿到完整页面。
+ * 代码一律合并 response cookie，两种站都吃得下，不必分开处理。
  */
 internal class PtcmsGuard {
     private val cookies = HashMap<String, String>()
@@ -32,8 +34,17 @@ internal class PtcmsGuard {
         cookies.putAll(solved)
         response = execute(build)
         cookies.putAll(response.cookies())
+        // 带上 cookie 重送之后**还是**挑战页 —— 表示这套解法对不上了(站方改了挑战写法)。
+        // 一定要抛：挑战页只有一千多字节、没有任何书籍内容，交回去解析的结果是
+        // 「这本书 0 集」「搜索没结果」，使用者只会以为源坏了、维护者也查不到方向。
+        // 这个专案已经在「故障伪装成内容」上吃过两次亏，不能在这里留第三个入口。
+        if (hasChallenge(response.body())) {
+            throw IOException("反爬挑战解不开，站点可能改了 guard 的写法")
+        }
         return response
     }
+
+    private fun hasChallenge(html: String) = CHALLENGE_PATTERN.containsMatchIn(html)
 
     /**
      * 有的站会限流(爱听书连续翻章节目录就会回 429)，退避重试。
@@ -75,8 +86,7 @@ internal class PtcmsGuard {
      * 解挑战页。返回 null 表示这次拿到的就是正常页面。
      */
     private fun solve(html: String): Map<String, String>? {
-        val reversed = Regex("""var\s+reversed\s*=\s*"([^"]+)"""")
-            .find(html)?.groupValues?.get(1) ?: return null
+        val reversed = CHALLENGE_PATTERN.find(html)?.groupValues?.get(1) ?: return null
         val script = String(base64Decode(reversed.reversed()), Charsets.UTF_8)
 
         // 脚本里的字符串与数字变量，cookie 值都是从这些变量拼出来的
@@ -121,6 +131,9 @@ internal class PtcmsGuard {
     }
 
     private companion object {
+        /** 挑战页的标志:一段倒序的 base64。solve() 与 hasChallenge() 共用，免得两处漂移 */
+        val CHALLENGE_PATTERN = Regex("""var\s+reversed\s*=\s*"([^"]+)"""")
+
         const val ALPHABET =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
         const val TOO_MANY_REQUESTS = 429

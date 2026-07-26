@@ -5,6 +5,7 @@ import com.github.eprendre.tingshu.sources.AudioUrlWebViewSniffExtractor
 import com.github.eprendre.tingshu.utils.Book
 import com.github.eprendre.tingshu.utils.CategoryMenu
 import com.github.eprendre.tingshu.utils.CategoryTab
+import java.net.URLEncoder
 
 /**
  * 爱听书 https://www.itingshu.net
@@ -43,9 +44,12 @@ object ITingShu : PtcmsTingShu() {
     override fun isWebViewNotRequired() = false
 
     /**
-     * 这个站把 UA 当风控依据：用旧 UA（例如 Chrome 77）请求章节目录页会直接回 429，
-     * 而书籍页照样放行，症状看起来很像限流，实际换个较新的 UA 就好。
-     * 所以这里不用 app 设置里的 UA，写死一个较新的。
+     * 写死一个较新的 UA，不用 app 设置里的。
+     *
+     * 当初的观察是：用旧 UA（Chrome 77）请求章节目录页会回 429、而书籍页照样放行。
+     * **2026-07 复验时这个现象没有重现**（同一个目录页用 Chrome 77 也拿到 200），
+     * 所以那次的 429 也可能本来就是次数型限流、UA 只是巧合。
+     * 无论如何写死新 UA 是无害的防御，留着；但别再把它当成已确认的因果。
      */
     override val userAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
@@ -73,17 +77,39 @@ object ITingShu : PtcmsTingShu() {
     }
 
     /**
-     * 搜索是 POST /novelsearch/search/result.html，body 只有 searchword。
+     * 搜索第 1 页是 POST /novelsearch/search/result.html，body 只有 searchword；
+     * **第 2 页起是普通 GET**，见 [searchPageUrl]。
      * 结果页结构与分类页相同，所以直接交给基类的 parseBooks。
-     * 站点搜索不分页，固定返回 1 页。
+     *
+     * 原本这里写死「站点搜索不分页，固定返回 1 页」—— 那是错的，站方分页栏就写着「共 3 页」。
+     * 后果是搜「斗罗大陆」只看得到 18 笔里的前 6 笔，续作《绝世唐门》《终极斗罗》
+     * 全都搜不到，而使用者只会以为这个源没收录。
      */
     override fun search(keywords: String, page: Int): Pair<List<Book>, Int> {
-        val doc = fetchPost(
-            "$baseUrl/novelsearch/search/result.html",
-            mapOf("searchword" to keywords),
-            "$baseUrl/"
-        )
-        return Pair(parseBooks(doc), 1)
+        val doc = if (page <= 1) {
+            fetchPost(
+                "$baseUrl/novelsearch/search/result.html",
+                mapOf("searchword" to keywords),
+                "$baseUrl/"
+            )
+        } else {
+            fetch(searchPageUrl(keywords, page), "$baseUrl/")
+        }
+        return Pair(parseBooks(doc), parseTotalPage(doc, page))
+    }
+
+    /**
+     * 搜索第 2 页起的地址。关键词的编码方式很特别:**URL-encode 之后把 `%` 换成 `oOo`**。
+     *
+     * 例如「斗罗大陆」→ `%E6%96%97...` → `oOoE6oOo96oOo97...`，
+     * 完整地址是 `/search/{代号}/lastupdate/{页码}.html`(实测可用)。
+     * 空格要一起处理 —— URLEncoder 会把空格编成 `+`，站方那边认的是 `oOo20`。
+     */
+    internal fun searchPageUrl(keywords: String, page: Int): String {
+        val code = URLEncoder.encode(keywords, "UTF-8")
+            .replace("+", "%20")
+            .replace("%", "oOo")
+        return "$baseUrl/search/$code/lastupdate/$page.html"
     }
 
     override fun getCategoryMenus(): List<CategoryMenu> {
@@ -108,7 +134,15 @@ object ITingShu : PtcmsTingShu() {
                     "all" to "全部有声",
                     "pingshu" to "长篇评书",
                     "xiangsheng" to "相声戏曲",
-                    "ertong" to "儿童故事"
+                    "ertong" to "儿童故事",
+                    // 以下是站方导览上有、这里原本漏收的
+                    "bjjt" to "百家讲坛",
+                    "chuanji" to "人物传记",
+                    "guanchangshangzhan" to "官场商战",
+                    "jingji" to "网游竞技",
+                    "jishi" to "经典纪实",
+                    "yule" to "综艺娱乐",
+                    "qita" to "其他有声"
                 )
             )
         )

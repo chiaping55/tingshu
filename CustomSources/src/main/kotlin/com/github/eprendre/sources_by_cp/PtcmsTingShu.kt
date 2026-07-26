@@ -204,6 +204,25 @@ abstract class PtcmsTingShu : TingShu() {
      */
     protected open val noAudioMessage: String = "这一集所有线路都没有音频，换一集试试"
 
+    /**
+     * 这个站的音频在**签名 cdn** 上，地址没有查询参数(签名)就一定播不出来。
+     *
+     * 麒麟听书的音频主机是 `vohwod-sign.qtfm.cn` —— 名字里的 sign 就是签名。
+     * 少了 `?auth_key=...` 一律 403，而站方给的 player 页有好几种形状：
+     * 有时签名在 setMedia 的拼接里、有时整个完整地址就在变量里、
+     * 有时**只给一个没签名的地址**(取址风控时)。
+     *
+     * 最后那种情况下没有任何可用地址。交回去只会让 app 请求失败、使用者看到播放错误，
+     * 而真正的原因(站点这次没给签名)完全表达不出来 —— 宁可回空，让上层照实提示
+     * 「等一两分钟再点这一集，不是源坏了」。
+     *
+     * 判断就看最终地址有没有查询参数，不去猜 player 页是哪种形状 ——
+     * 之前用"我们有没有拼过它"当判据，结果站方直接给没签名的 `.mp3` 那次就漏掉了。
+     *
+     * 起点系那批站的 cdn 不校验签名，接 murl 就能播，所以默认 false。
+     */
+    protected open val audioRequiresSignedUrl: Boolean = false
+
     override fun search(keywords: String, page: Int): Pair<List<Book>, Int> {
         val url = "$baseUrl/search.html?searchtype=name" +
             "&searchword=${URLEncoder.encode(keywords, "UTF-8")}&page=$page"
@@ -215,9 +234,9 @@ abstract class PtcmsTingShu : TingShu() {
         val doc = fetch(url)
         val pager = doc.selectFirst("div.fanye")
         val currentPage = pager?.selectFirst("strong")?.text()?.trim()?.toIntOrNull() ?: 1
-        // 有"下一页"就用它；没有的话找页码等于当前页+1 的那个链接
+        // 有"下一页/下页"就用它；没有的话找页码等于当前页+1 的那个链接
         val nextUrl = pager?.select("a")
-            ?.firstOrNull { it.text().contains("下一页") }
+            ?.firstOrNull { link -> NEXT_PAGE_LABELS.any { link.text().contains(it) } }
             ?.absUrl("href")
             ?: pager?.select("a")
                 ?.firstOrNull { it.text().trim().toIntOrNull() == currentPage + 1 }
@@ -374,18 +393,62 @@ abstract class PtcmsTingShu : TingShu() {
      */
     internal fun audioUrl(playerHtml: String): String {
         val match = Regex("""\b(url\d*)\s*=\s*'(https?://[^']*)'""").find(playerHtml)
-        val name = match?.groupValues?.get(1) ?: return ""
-        val url = match.groupValues[2]
-        if (url.isEmpty()) return ""
-        // 播放器初始化时把变量和一段字符串拼起来，那段就是真后缀(可能带签名参数)：
-        //   mp3:''+url4401744813+'.m4a?auth_key=...'
-        // 不去匹配 setMedia 的调用形状(实际是 jPlayer("setMedia", {...})，写法各站不同)，
-        // 只认"这个变量后面紧跟着 + '字符串'"—— 那个组合只会出现在这里。
-        val fromPlayer = Regex("""\b$name\s*\+\s*'([^']*)'""")
+        if (match != null) {
+            val name = match.groupValues[1]
+            val url = match.groupValues[2]
+            // 播放器初始化时把变量和一段字符串拼起来，那段就是真后缀(可能带签名参数)：
+            //   mp3:''+url4401744813+'.m4a?auth_key=...'
+            // 不去匹配 setMedia 的调用形状(实际是 jPlayer("setMedia", {...})，写法各站不同)，
+            // 只认"变量后面紧跟着 + '字符串'"—— 那个组合只会出现在这里。
+            //
+            // 先找和 url 变量**同名**的那个拼接(最精确)；找不到再放宽成"任何 url 变量的拼接"。
+            // 放宽这一步是必要的：麒麟听书有时会在同一页里放两个 url 变量，
+            // setMedia 引用的不是带地址那个 —— 只认同名的话就取不到签名参数，
+            // 退回接 murl 拼出 `....mp3`，而那个地址 cdn 一律回 403(实测)。
+            val sameName = Regex("""\b$name\s*\+\s*'([^']*)'""")
+                .find(playerHtml)?.groupValues?.get(1)
+            val anyName = Regex("""\burl\d+\s*\+\s*'([^']+)'""")
+                .find(playerHtml)?.groupValues?.get(1)
+            // **单一出口**:签名检查是横切规则，得套在每一种形状上。
+            // 原本三条路各自 return，结果 setMedia 拼接那两条绕过了检查 ——
+            // 站方给 `''+urlN+'.mp3'`(没签名)那次就漏掉了，交出去照样 403。
+            val candidate = when {
+                !sameName.isNullOrEmpty() -> url + sameName
+                !anyName.isNullOrEmpty() -> url + anyName
+                else -> withMurlSuffix(url, playerHtml)
+            }
+            // 签名 cdn 上的音频，没有签名参数就是个注定 403 的地址 —— 见 audioRequiresSignedUrl
+            if (audioRequiresSignedUrl && !candidate.contains('?')) return ""
+            return candidate
+        }
+        // url 变量是空的 —— 起点有声网的**默认线路**就是这样：地址直接写死在
+        // setMedia 的字面量里(`mp3:'https://car-lv.kuwo.cn/....mp3'`)，url 变量留空。
+        // 少了这一条，每一集都要多打 1~3 个请求去换线路才拿到地址，而换到的字符串
+        // 和这里的字面量一字不差 —— site 参数只换 player 模板、不换媒体，那些请求纯属浪费。
+        // 幻听网同一台服务器却是填在 url 变量里的，所以两条路都要留。
+        //
+        // 必须排在 url 变量那条路**后面**：麒麟听书写的是 `mp3:''+url<N>+'...'`，
+        // `mp3:` 后面不是 `'http`，不会被这条误抢(有测试钉住)。
+        val literal = Regex("""\bmp3\s*:\s*'(https?://[^']*)'""")
             .find(playerHtml)?.groupValues?.get(1)
-        if (!fromPlayer.isNullOrEmpty()) return url + fromPlayer
-        val hasExtension = AUDIO_SUFFIXES.any { url.endsWith(it, ignoreCase = true) }
-        if (hasExtension) return url
+        if (!literal.isNullOrEmpty()) return withMurlSuffix(literal, playerHtml)
+        return ""
+    }
+
+    /**
+     * 地址不带扩展名时接上 murl 里那个后缀，否则 cdn 回 403。
+     *
+     * **判断扩展名要看路径、不能看整串结尾。** 站方有时把完整的签名地址直接放进变量：
+     *   `https://vohwod-sign.qtfm.cn/m4a/xxx_24.m4a?auth_key=...d3a4`
+     * 整串是以 auth_key 的十六进制结尾的，`endsWith(".m4a")` 于是判成"没有扩展名"，
+     * 又接一次 `.mp3` 上去 —— 把一个本来能播的地址改成 403。
+     * 这个 bug 在带查询参数的地址出现之前一直藏着，是测试真的下载音频才逼出来的。
+     */
+    private fun withMurlSuffix(url: String, playerHtml: String): String {
+        val path = url.substringBefore('?').substringBefore('#')
+        if (AUDIO_SUFFIXES.any { path.endsWith(it, ignoreCase = true) }) return url
+        // 已经带查询参数的地址通常是签好名的完整地址，别再往后面接东西
+        if (url.contains('?')) return url
         val suffix = Regex("""\bmurl\d*\s*=\s*'([^']*)'""")
             .find(playerHtml)?.groupValues?.get(1) ?: ""
         return url + suffix
@@ -395,12 +458,22 @@ abstract class PtcmsTingShu : TingShu() {
         return doc.select("ul.list-works > li").mapNotNull { item ->
             val titleLink = item.selectFirst("dt.list-book-dt a") ?: return@mapNotNull null
             val status = item.selectFirst("dt.list-book-dt span")?.text() ?: ""
+            // 列表页的两个字段各站摆法不同，别对调了 ——
+            // 爱听书有独立的 span.book-boyin 放演播(多人剧会有十几个 a)，
+            // 而 span.book-author 放的是**作者**(站方还把它 display:none 藏起来)。
+            // 起点系只有 span.book-author，里面确实是演播。
+            // 原本一律把 book-author 当演播，于是爱听书的列表把作者显示成演播者 ——
+            // 而演播者正是判断"是不是收藏里那一版"的唯一依据。
+            val boyin = item.select("dd.list-book-cs span.book-boyin a")
+            val authorSpan = item.selectFirst("dd.list-book-cs span.book-author a")?.text() ?: ""
+            val artist = if (boyin.isNotEmpty()) boyin.joinToString(" ") { it.text() } else authorSpan
+            val author = if (boyin.isNotEmpty()) authorSpan else ""
             Book(
                 imageUrl(item.selectFirst("div.list-imgbox img")),
                 titleLink.absUrl("href"),
                 titleLink.text().removeSuffix(titleSuffix),
-                "",// 站点列表和详情页都不提供作者，只有演播
-                item.selectFirst("dd.list-book-cs span.book-author a")?.text() ?: ""
+                author,
+                artist
             ).apply {
                 intro = item.selectFirst("dd.list-book-des")?.text() ?: ""
                 this.status = status
@@ -445,16 +518,39 @@ abstract class PtcmsTingShu : TingShu() {
      */
     internal fun parseTotalPage(doc: Document, currentPage: Int): Int {
         val pager = doc.selectFirst("div.fanye") ?: return currentPage
-        // 有的站直接写"共 607 页"，这是最可靠的
+        // "尾页"链接里的页码最可靠 —— 那是站方自己算出来要跳过去的地方。
+        // 曾经优先信分页栏写的"共 N 页"，结果爱听书那个数字是错的：
+        // 玄幻分类写"共 607 页"而尾页指向第 304 页，app 于是显示 607 页、
+        // 第 305 页之后全是空白。站方的文案会写错，跳转链接不会。
+        lastPageNumber(pager)?.let { return maxOf(it, currentPage) }
+        // 没有尾页链接才退回文案
         Regex("""共\s*(\d+)\s*页""").find(pager.text())?.groupValues?.get(1)?.toIntOrNull()
-            ?.let { return it }
+            ?.let { return maxOf(it, currentPage) }
         val maxNumbered = pager.select("a, strong")
             .mapNotNull { it.text().trim().toIntOrNull() }
             .maxOrNull() ?: currentPage
-        val hasNext = pager.select("a").any { it.text().contains("下一页") }
-        return if (hasNext && maxNumbered <= currentPage) currentPage + 1
+        return if (hasNextLink(pager) && maxNumbered <= currentPage) currentPage + 1
         else maxOf(maxNumbered, currentPage)
     }
+
+    /** "尾页"链接指向的页码 */
+    private fun lastPageNumber(pager: Element): Int? {
+        val href = pager.select("a")
+            .firstOrNull { LAST_PAGE_LABELS.any { label -> it.text().contains(label) } }
+            ?.attr("href") ?: return null
+        // 页码是路径里最后一段数字，例如 /yousheng/xuanhuan/lastupdate/1/304.html
+        return Regex("""(\d+)\.html""").find(href)?.groupValues?.get(1)?.toIntOrNull()
+            ?: Regex("""(\d+)/?$""").find(href)?.groupValues?.get(1)?.toIntOrNull()
+    }
+
+    /**
+     * 有没有"下一页"。
+     *
+     * 各站文案不同 —— 爱听书写的是"下页"(两个字)，所以原本只认"下一页"那条规则
+     * 在这个站永远空转，靠后面"页码等于当前页+1"的兜底才凑出来。
+     */
+    private fun hasNextLink(pager: Element) =
+        pager.select("a").any { link -> NEXT_PAGE_LABELS.any { link.text().contains(it) } }
 
     /** 列表图片是懒加载的，真地址在 data-original，src 只是占位图 */
     private fun imageUrl(img: Element?): String {
@@ -470,6 +566,11 @@ abstract class PtcmsTingShu : TingShu() {
 
         /** 提示页只有几百字，真实书籍页有几千字 —— 用长度把两者分开，避免误判 */
         private const val INTERSTITIAL_MAX_CHARS = 600
+
+        /** 各站的"下一页"文案不一样:起点系写"下一页"，爱听书写"下页" */
+        private val NEXT_PAGE_LABELS = listOf("下一页", "下页")
+
+        private val LAST_PAGE_LABELS = listOf("尾页", "末页", "最后一页")
 
         /**
          * 默认线路拿不到地址时依次尝试的线路号。

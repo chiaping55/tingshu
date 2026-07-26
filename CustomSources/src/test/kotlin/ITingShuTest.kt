@@ -4,6 +4,7 @@ import assertk.assertions.isEqualTo
 import assertk.assertions.isGreaterThan
 import assertk.assertions.isNotEmpty
 import assertk.assertions.isTrue
+import com.github.eprendre.sources_by_cp.ITingShu
 import com.github.eprendre.sources_by_cp.PtcmsTingShu
 import com.github.eprendre.tingshu.utils.CategoryMenu
 import com.github.eprendre.tingshu.utils.CategoryTab
@@ -195,5 +196,26 @@ class ITingShuTest {
         val totalPage = source.parseEpisodeTotalPage(secondPage)
         println("总页数 = $totalPage")
         assertThat(totalPage).isGreaterThan(20)
+    }
+
+    /**
+     * 搜索第 2 页起的地址组装 —— 纯字符串处理，不依赖网络。
+     *
+     * 这个站的关键词编码很特别:URL-encode 之后把 `%` 换成 `oOo`。
+     * 原本 search() 写死「不分页、固定回 1 页」，搜「斗罗大陆」只看得到 18 笔里的前 6 笔，
+     * 续作全都搜不到，而使用者只会以为这个源没收录。
+     */
+    @Test
+    fun searchPageUrlUsesTheOddEncoding() {
+        val url = ITingShu.searchPageUrl("斗罗大陆", 2)
+        println("第2页 = $url")
+        assertThat(url).isEqualTo(
+            "https://www.itingshu.net/search/" +
+                "oOoE6oOo96oOo97oOoE7oOoBDoOo97oOoE5oOoA4oOoA7oOoE9oOo99oOo86" +
+                "/lastupdate/2.html"
+        )
+        // 空格不能留成 +，站方认的是 oOo20
+        assertThat(ITingShu.searchPageUrl("a b", 3))
+            .isEqualTo("https://www.itingshu.net/search/aoOo20b/lastupdate/3.html")
     }
 }

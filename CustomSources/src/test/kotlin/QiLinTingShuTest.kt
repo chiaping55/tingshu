@@ -29,6 +29,15 @@ class QiLinTingShuTest {
 
             override val audioFallbackSites = emptyList<Int>()
 
+            /**
+             * 必须和 QiLinTingShu 保持一致。
+             *
+             * 这份匿名复本每加一个 override 就多一处会漂移的地方 —— 这一轮已经踩过两次:
+             * 先是 ITingShuTest 漏了 userAgent(害我把选择器 bug 误判成站点限流)，
+             * 接着是这里漏了 audioRequiresPlayerSuffix。加 override 时记得两边都改。
+             */
+            override val audioRequiresSignedUrl = true
+
             override fun getSourceId() = "e4a7d95c1b8f43629d0e5a76c2b18f3d"
 
             override fun getName() = "麒麟听书"
@@ -138,14 +147,46 @@ class QiLinTingShuTest {
         )
     }
 
-    /** 没有 setMedia 时仍照旧用 murl —— 起点系那批站靠这条 */
+    /**
+     * 这个站没给签名后缀时要回**空**，不能接 murl 拼一个注定 403 的地址。
+     *
+     * (原本这条断言的是"接 murl 拼出 .mp3"—— 那是起点系的正确行为，
+     *  拿麒麟的替身来测本来就放错了地方。起点系那条现在在 PlayerUrlShapesTest 里。)
+     */
     @Test
-    fun audioUrlFallsBackToMurl() {
+    fun audioUrlEmptyWhenSignedSuffixMissing() {
         val html = """
             murl123 = '.mp3';
-            url123 = 'https://cdn.example.com/a/b';
+            url123 = 'https://vohwod-sign.qtfm.cn/m4a/a/b';
         """.trimIndent()
-        assertThat(source.audioUrl(html)).isEqualTo("https://cdn.example.com/a/b.mp3")
+        assertThat(source.audioUrl(html)).isEqualTo("")
+    }
+
+    /** 站方把完整签名地址直接放进变量时，**不能**再往后面接 murl */
+    @Test
+    fun doesNotAppendSuffixToAnAlreadySignedUrl() {
+        val signed = "https://vohwod-sign.qtfm.cn/m4a/60d4_24.m4a?auth_key=6a66d31e-987422-0-9c23026d"
+        val html = "murl9 = '.mp3';\nurl9 = '$signed';"
+        val url = source.audioUrl(html)
+        println("取到 = $url")
+        assertThat(url).isEqualTo(signed)
+    }
+
+    /**
+     * setMedia 的拼接后缀**没带签名**时也要被挡住。
+     *
+     * 这是签名检查的漏洞:原本三种形状各自提早 return，检查只套在接 murl 那条路上，
+     * 于是站方给 `''+urlN+'.mp3'` 那次照样交出一个注定 403 的地址。
+     * 横切规则要有单一出口 —— 这条测试就是钉这件事。
+     */
+    @Test
+    fun unsignedConcatenationSuffixIsAlsoRejected() {
+        val html = """
+            murl55 = '.mp3';
+            url55 = 'https://vohwod-sign.qtfm.cn/m4a/60d4_24';
+            ${'$'}(this).jPlayer("setMedia", { mp3:''+url55+'.mp3' }).jPlayer("play");
+        """.trimIndent()
+        assertThat(source.audioUrl(html)).isEqualTo("")
     }
 
     /** url 为空时要返回空字符串，不能拼出一个只有后缀的假地址 */

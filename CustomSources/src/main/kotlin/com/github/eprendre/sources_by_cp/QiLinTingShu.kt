@@ -33,6 +33,12 @@ object QiLinTingShu : PtcmsTingShu() {
     override val audioFallbackSites = emptyList<Int>()
 
     /**
+     * 音频在 vohwod-sign.qtfm.cn(签名 cdn)上，没有 `?auth_key=...` 一律 403。
+     * 所以站方没给签名时要回空、照实提示，而不是交出一个注定 403 的地址。
+     */
+    override val audioRequiresSignedUrl = true
+
+    /**
      * 取址冷却是分钟级的(实测隔 25 秒都还不给)，所以别重试 —— 见基类注释。
      * 正常听书一集听几十分钟才换下一集，完全碰不到这个限制；
      * 只有连着快速跳集才会撞上。
