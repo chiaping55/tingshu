@@ -143,6 +143,45 @@ abstract class PtcmsTingShu : TingShu() {
      */
     protected open val episodePageDelay: LongRange = 100L..500L
 
+    /**
+     * 这个站没有单独的章节目录页(没有 a.dirurl)，书页本身就是章节第 1 页。
+     *
+     * 麒麟听书是这一型：书页列前 30 集(正序)，后面的页在 /tingshu/{id}/p{N}.html，
+     * 总页数看"快速选集"那个列表。起点系不是这样，所以默认 false。
+     */
+    protected open val bookPageIsFirstEpisodePage: Boolean = false
+
+    /** 配合上面那个开关，给出书页第 [page] 页的地址 */
+    protected open fun bookPageEpisodeUrl(bookUrl: String, page: Int): String =
+        bookUrl.trimEnd('/') + "/p$page.html"
+
+    /** 给测试用：bookPageEpisodeUrl 是 protected，测试从外面调不到 */
+    internal fun bookPageEpisodeUrlForTest(bookUrl: String, page: Int) =
+        bookPageEpisodeUrl(bookUrl, page)
+
+    /**
+     * 默认线路拿不到地址时依次尝试的线路号。
+     *
+     * 留空表示这个站不支持换线路 —— 麒麟听书的播放器地址带一次性 token，
+     * 重打同一个地址只会拿到 "Access Denied"，白费请求还可能触发风控；
+     * 那种站改走"重取章节页换新 token"的重试。
+     */
+    protected open val audioFallbackSites: List<Int> = FALLBACK_SITES
+
+    /**
+     * 拿不到地址时重取章节页换新 token 的次数。
+     *
+     * 默认 0 —— 站点不给地址通常是取址风控，短间隔重试帮不上忙还会加重限流。
+     * 只有确认是偶发空值的站才调大。
+     */
+    protected open val freshTokenRetries: Int = 0
+
+    /**
+     * 取不到音频时给用户的提示。要说清楚**该怎么办**，
+     * 而不是笼统地"失败了"—— 限流和这一集真的没音频，处理方式完全不同。
+     */
+    protected open val noAudioMessage: String = "这一集所有线路都没有音频，换一集试试"
+
     override fun search(keywords: String, page: Int): Pair<List<Book>, Int> {
         val url = "$baseUrl/search.html?searchtype=name" +
             "&searchword=${URLEncoder.encode(keywords, "UTF-8")}&page=$page"
@@ -185,7 +224,17 @@ abstract class PtcmsTingShu : TingShu() {
         if (loadEpisodes) {
             // 详情页只列最新几集且是倒序，完整章节在 a.dirurl 指向的目录页。
             val dirUrl = doc.selectFirst("a.dirurl")?.absUrl("href")
-            if (dirUrl == null) {
+            if (bookPageIsFirstEpisodePage) {
+                // 这一类站没有单独的目录页：书页本身就是章节第 1 页(而且是正序)，
+                // 后面几页在 bookPageEpisodeUrl 给的地址上。
+                episodes.addAll(parseEpisodes(doc))
+                val totalPage = parseEpisodeTotalPage(doc)
+                if (loadFullPages && totalPage > 1) {
+                    loadRemainingPages(2..totalPage, totalPage, episodes) { page ->
+                        fetch(bookPageEpisodeUrl(bookUrl, page), bookUrl)
+                    }
+                }
+            } else if (dirUrl == null) {
                 // 站点没给目录页(少数书)，只能用详情页那一小段
                 episodes.addAll(parseEpisodes(doc).asReversed())
             } else {
@@ -196,33 +245,48 @@ abstract class PtcmsTingShu : TingShu() {
                 episodes.addAll(parseEpisodes(firstPage))
                 val totalPage = parseEpisodeTotalPage(firstPage)
                 if (loadFullPages && totalPage > 1) {
-                    pageList.clear()
-                    pageList.addAll(2..totalPage)
-                    try {
-                        while (pageList.isNotEmpty()) {
-                            val page = pageList.removeAt(0)
-                            notifyLoading("$page / $totalPage")
-                            val doc2 = fetchDirectoryPage(dirUrl, page)
-                            val pageEpisodes = parseEpisodes(doc2)
-                            // 站点被打太急时会回一个 200 的"访问过于频繁"页，解析不到章节。
-                            // 这种要当限流处理并停下，否则会把后面的页数都白跑一遍。
-                            if (pageEpisodes.isEmpty() && isThrottlePage(doc2)) {
-                                throw IOException("站点提示访问过于频繁")
-                            }
-                            episodes.addAll(pageEpisodes)
-                            Thread.sleep(Random.nextLong(episodePageDelay.first, episodePageDelay.last))
-                        }
-                    } catch (e: Exception) {
-                        // 站点限流或临时故障时，保留已经抓到的章节而不是整本失败；
-                        // 提示一下，免得用户以为这本书就只有这么多集。
-                        pageList.clear()
-                        toast("章节只加载了一部分(${episodes.size}集)，站点限流了，稍后重新进入可续加载")
+                    loadRemainingPages(2..totalPage, totalPage, episodes) { page ->
+                        fetchDirectoryPage(dirUrl, page)
                     }
-                    notifyLoading(null)
                 }
             }
         }
         return BookDetail(episodes, intro, artist, author, episodes.size, coverUrl)
+    }
+
+    /**
+     * 把第 2 页到最后一页的章节接着抓下来。
+     *
+     * 限流或临时故障时**保留已经抓到的部分**而不是整本失败 —— 用户至少还能听前面几百集；
+     * 但要提示一声，否则会以为这本书就只有这么多集。
+     */
+    private fun loadRemainingPages(
+        pages: IntRange,
+        totalPage: Int,
+        into: ArrayList<Episode>,
+        fetchPage: (Int) -> Document
+    ) {
+        pageList.clear()
+        pageList.addAll(pages)
+        try {
+            while (pageList.isNotEmpty()) {
+                val page = pageList.removeAt(0)
+                notifyLoading("$page / $totalPage")
+                val doc = fetchPage(page)
+                val pageEpisodes = parseEpisodes(doc)
+                // 站点被打太急时会回一个 200 的"访问过于频繁"页，解析不到章节。
+                // 这种要当限流处理并停下，否则会把后面的页数都白跑一遍。
+                if (pageEpisodes.isEmpty() && isThrottlePage(doc)) {
+                    throw IOException("站点提示访问过于频繁")
+                }
+                into.addAll(pageEpisodes)
+                Thread.sleep(Random.nextLong(episodePageDelay.first, episodePageDelay.last))
+            }
+        } catch (e: Exception) {
+            pageList.clear()
+            toast("章节只加载了一部分(${into.size}集)，站点限流了，稍后重新进入可续加载")
+        }
+        notifyLoading(null)
     }
 
     override fun getAudioUrlExtractor(): AudioUrlExtractor {
@@ -243,11 +307,25 @@ abstract class PtcmsTingShu : TingShu() {
             return ""
         }
         audioUrl(fetchHtml(playerUrl, chapterUrl)).let { if (it.isNotEmpty()) return it }
-        for (site in FALLBACK_SITES) {
+        for (site in audioFallbackSites) {
             val url = audioUrl(fetchHtml(withSite(playerUrl, site), chapterUrl))
             if (url.isNotEmpty()) return url
         }
-        toast("这一集所有线路都没有音频，换一集试试")
+        // 有的站换线路这条路走不通(播放器地址里的 token 一次性，重打只会被拒)，
+        // 那就重新取章节页换张新票再试。
+        //
+        // 注意**别在这里做短间隔重试**：麒麟听书那种站的取址冷却是分钟级的
+        // (实测隔 25 秒都还不给)，一两秒后再要只是在被限流时多打两次请求，
+        // 反而可能把冷却拖更久。所以默认不重试，只有确实是"偶发空值"的站才打开。
+        repeat(freshTokenRetries) {
+            Thread.sleep(Random.nextLong(600L, 1200L))
+            val retryUrl = fetch(chapterUrl).selectFirst("iframe#play")?.absUrl("src")
+            if (!retryUrl.isNullOrEmpty()) {
+                val url = audioUrl(fetchHtml(retryUrl, chapterUrl))
+                if (url.isNotEmpty()) return url
+            }
+        }
+        toast(noAudioMessage)
         return ""
     }
 
@@ -262,11 +340,28 @@ abstract class PtcmsTingShu : TingShu() {
      * 扩展名单独放在 murlXXXXXX 里。站点有些线路给的 url 不带扩展名，
      * 这时必须接上 murl，否则 cdn 直接回 403。
      * 用 \b 开头是为了不误匹配 murl / preurl / nexturl。
+     *
+     * 后缀有两个来源，**优先用 setMedia 里那个**：
+     *
+     *     url4401744813 = 'https://vohwod-sign.qtfm.cn/m4a/60d4...';
+     *     murl4401744813 = '.mp3';
+     *     ...setMedia({ mp3: ''+url4401744813+'.m4a?auth_key=6a663e1c-...' })
+     *
+     * 麒麟听书就是这样：真正要用的是 `.m4a?auth_key=...`(带签名)，而 murl 写的是 `.mp3`。
+     * 拿 murl 拼出来的地址 cdn 一律回 403 —— 表象是"地址取到了却播不出来"。
      */
     internal fun audioUrl(playerHtml: String): String {
-        val url = Regex("""\burl\d*\s*=\s*'(https?://[^']*)'""")
-            .find(playerHtml)?.groupValues?.get(1) ?: ""
+        val match = Regex("""\b(url\d*)\s*=\s*'(https?://[^']*)'""").find(playerHtml)
+        val name = match?.groupValues?.get(1) ?: return ""
+        val url = match.groupValues[2]
         if (url.isEmpty()) return ""
+        // 播放器初始化时把变量和一段字符串拼起来，那段就是真后缀(可能带签名参数)：
+        //   mp3:''+url4401744813+'.m4a?auth_key=...'
+        // 不去匹配 setMedia 的调用形状(实际是 jPlayer("setMedia", {...})，写法各站不同)，
+        // 只认"这个变量后面紧跟着 + '字符串'"—— 那个组合只会出现在这里。
+        val fromPlayer = Regex("""\b$name\s*\+\s*'([^']*)'""")
+            .find(playerHtml)?.groupValues?.get(1)
+        if (!fromPlayer.isNullOrEmpty()) return url + fromPlayer
         val hasExtension = AUDIO_SUFFIXES.any { url.endsWith(it, ignoreCase = true) }
         if (hasExtension) return url
         val suffix = Regex("""\bmurl\d*\s*=\s*'([^']*)'""")
@@ -355,7 +450,7 @@ abstract class PtcmsTingShu : TingShu() {
          * 默认线路拿不到地址时依次尝试的线路号。
          * 实测同一集里 11、14 给的地址自带扩展名，其它几条要接 murl，都能播。
          */
-        private val FALLBACK_SITES = listOf(11, 14, 2, 13, 15, 17, 20, 8)
+        val FALLBACK_SITES = listOf(11, 14, 2, 13, 15, 17, 20, 8)
 
         /**
          * 生成分类菜单。传入 代号 to 名称，url 按 /book/{代号}/lastupdate.html 拼。

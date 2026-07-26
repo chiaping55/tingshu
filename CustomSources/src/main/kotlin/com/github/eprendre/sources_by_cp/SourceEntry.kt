@@ -29,6 +29,8 @@ object SourceEntry {
             ITingShu,
             QiDianYouSheng,
             HuanTingWang39,
+            // 麒麟听书:书多、更新勤，音频在蜻蜓FM，和上面几个源的片源不同
+            QiLinTingShu,
             TingShuBa,
             LeTingBa,
             // 第三个模板家族(GXLCMS)。加它是为了补品类而不是凑数量:
