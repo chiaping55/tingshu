@@ -28,9 +28,10 @@ https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.jso
 
 | 源 | 站点 | 模板 | 实测可播率 |
 |---|---|---|---|
-| 爱听书 | www.itingshu.net | PTCMS | 音频走 WebView，未测 |
+| 爱听书 | www.itingshu.net | PTCMS | 音频走 WebView，真机实测可播 |
 | 起点有声网 | www.qdysw.com | PTCMS | 95% |
 | 幻听网 | www.ting39.com | PTCMS | 95% |
+| ting15 | www.ting15.com | GXLCMS | 相声/曲艺/网文可播，评书那类境外连不上 |
 | 听书吧 | www.ting8.cc | DedeCMS | 48% |
 | 乐听吧 | www.leting8.com | DedeCMS | 40% |
 
@@ -38,6 +39,12 @@ https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.jso
   —— 处理 PTCMS 站群共有的 guard 反爬 cookie 握手、分页章节目录、音频地址拼接与线路重试
 - [DedeCmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/DedeCmsTingShu.kt)
   —— 处理 DedeCMS 站群的路径段差异、喜马拉雅 CDN 的防盗链与音质后缀
+- [GxlCmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/GxlCmsTingShu.kt)
+  —— GXLCMS 家族。音频靠 POST 换 JSON 拿直链，处理 unicode 转义还原、非 ASCII 路径的
+  百分号编码、以及取址接口的 status 语义(限流/缺章/付费要分清)
+
+加 ting15 的理由是**补品类而不是凑数量** —— 相声小品、曲艺戏曲这些前面几个源都没有。
+挑源的标准是"能不能听到想听的书"，同样的网文有声再重复一遍没有意义。
 
 除爱听书外，音频都是 mp3/m4a 直链、`isWebViewNotRequired = true`，手表等没有 WebView 的设备也能用；
 爱听书的真实地址由被商业混淆的 player js 生成，只能靠 WebView 嗅探，所以那个源需要 WebView。
@@ -49,6 +56,16 @@ https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.jso
 而是按订阅 json 所在的位置推算同目录下的 `<entry_package>.jar`。
 一开始放在 `sources/` 底下，加订阅一直报「外部源载入失败」，换主机、换 MIME、
 换 jar 内容都不是原因，挪到根目录就立刻成功了。详情见 [sources/README.md](sources/README.md)。
+
+**几个值得记下来的坑**（详情见 [sources/README.md](sources/README.md)）：
+
+- **别用 Java 21 的 `List.reversed()`** 这类 SequencedCollection 方法 —— 安卓上不存在，
+  而且和 Kotlin 同名扩展函数撞车，本机 JVM 测试可能一起通过，等于埋雷。用 `asReversed()`。
+- **别拿"最新几集"当播放列表**：详情页自带的那 10 集交给 app，app 会当成整本书 ——
+  一本 2640 集的书显示成 1/10、播放位置全乱。宁可诚实报错。
+- **网络测试红了先读断言内容**：「解析出 0 集」是选择器问题，429 才是限流。
+  这两个的表象很像，混淆了会往完全错误的方向查。
+- **测试别复制正式代码的选择器**，直接调正式的解析函数 —— 否则两边"一起错"就互相印证不出来。
 
 **测试会真的下载一段音频**验证能播，而不是只断言「拿到地址了」。基类把两个只有 app 才有实现的调用
 （`config()` / `notifyLoadingEpisodes()`）包成可覆写方法，所以单元测试跑的是正式解析代码本身，
