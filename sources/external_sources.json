@@ -1,7 +1,0 @@
-{
-  "version": 5,
-  "entry_package": "sources_by_cp",
-  "download_url": "https://cdn.jsdelivr.net/gh/chiaping55/tingshu@master/sources/sources_by_cp.bin",
-  "update_msg": "回退到已验证可用的版本(4个源，暂无爱听书)，用来确认订阅管道本身是通的。",
-  "support_url": ""
-}

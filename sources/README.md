@@ -7,10 +7,25 @@
 app 里 **源管理 → 订阅 → 右上角添加**，粘贴（结尾不要加斜杠）：
 
 ```
-https://raw.githubusercontent.com/chiaping55/tingshu/master/sources/update.json
+https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.json
 ```
 
 app 每次启动会比对 `version`，有更新自动下载。
+
+
+## 订阅文件为什么放在仓库根目录
+
+**app 不是照 `download_url` 去抓 jar 的**，它自己按订阅 json 所在的位置推算同目录下的
+`<entry_package>.jar`。所以 json 和 jar 必须放在同一层。
+
+这一点是排查出来的：一开始把 `update.json` 放在 `sources/` 子目录，加订阅一直报
+「外部源载入失败, 请确认app为最新版并重启手机」。中间换过主机（jsDelivr）、换过
+MIME（`application/json` vs `text/plain`）、把 jar 换成早先验证可用的旧版、
+也确认过手机浏览器能打开那个网址、订阅记录里没有残留项 —— 全都不是原因。
+把 json 和 jar 一起挪到根目录、命名照抄社区能用的那两个订阅之后，一次就成功。
+
+所以改这个项目时记住：**`sources_by_cp.jar` 与 `external_sources.json` 要一起待在根目录**，
+别为了整齐把它们收进子文件夹。
 
 ## 手动导入（订阅连不上时）
 
@@ -25,6 +40,7 @@ adb shell chmod 444 /sdcard/Android/data/com.github.eprendre.tingshu/files/jars/
 
 | 源 | 站点 | 模板 | 实测可播率 | 备注 |
 |---|---|---|---|---|
+| 爱听书 | www.itingshu.net | PTCMS | 未测(音频走 WebView) | 近年多人有声剧收录最全；需要 WebView |
 | 爱听书 | www.itingshu.net | PTCMS | 未测(音频走 WebView) | 近年多人有声剧收录最全；需要 WebView |
 | 起点有声网 | www.qdysw.com | PTCMS | **95%** | 约 1.5 万本 |
 | 幻听网 | www.ting39.com | PTCMS | **95%** | 与 22ting.com（一夜幻听）同品牌，但没有 cloudflare 拦截 |

@@ -1,7 +1,7 @@
 {
-  "version": 5,
+  "version": 6,
   "entry_package": "sources_by_cp",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp.jar",
-  "update_msg": "自维护听书源(起点有声网、幻听网、乐听网、听书吧、乐听吧)。",
+  "update_msg": "新增爱听书(近年多人有声剧收录最全，音频走 WebView 嗅探)。",
   "support_url": ""
 }

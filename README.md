@@ -12,7 +12,7 @@
 app 里 **源管理 → 订阅 → 右上角添加**，粘贴（结尾不要加斜杠）：
 
 ```
-https://raw.githubusercontent.com/chiaping55/tingshu/master/sources/update.json
+https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.json
 ```
 
 包含的源、实测可播率、以及踩过的坑都记在 [sources/README.md](sources/README.md)。
@@ -28,9 +28,9 @@ https://raw.githubusercontent.com/chiaping55/tingshu/master/sources/update.json
 
 | 源 | 站点 | 模板 | 实测可播率 |
 |---|---|---|---|
+| 爱听书 | www.itingshu.net | PTCMS | 音频走 WebView，未测 |
 | 起点有声网 | www.qdysw.com | PTCMS | 95% |
 | 幻听网 | www.ting39.com | PTCMS | 95% |
-| 乐听网 | www.leting.vip | PTCMS | 85% |
 | 听书吧 | www.ting8.cc | DedeCMS | 48% |
 | 乐听吧 | www.leting8.com | DedeCMS | 40% |
 
