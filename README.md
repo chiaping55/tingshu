@@ -39,9 +39,16 @@ https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.jso
 - [DedeCmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/DedeCmsTingShu.kt)
   —— 处理 DedeCMS 站群的路径段差异、喜马拉雅 CDN 的防盗链与音质后缀
 
-音频全部是 mp3/m4a 直链，`isWebViewNotRequired = true`，手表等没有 WebView 的设备也能用。
+除爱听书外，音频都是 mp3/m4a 直链、`isWebViewNotRequired = true`，手表等没有 WebView 的设备也能用；
+爱听书的真实地址由被商业混淆的 player js 生成，只能靠 WebView 嗅探，所以那个源需要 WebView。
 
-**发布用的订阅文件**在 [sources/](sources/)：`update.json` + 编译好的 jar，改完源更新版本号，app 下次启动自动更新。
+**发布用的订阅文件在仓库根目录**：[external_sources.json](external_sources.json) 与编译好的
+[sources_by_cp.jar](sources_by_cp.jar)，改完源更新版本号，app 下次启动自动更新。
+
+这两个文件必须放在同一层，**不能收进子目录** —— app 不照 `download_url` 抓 jar，
+而是按订阅 json 所在的位置推算同目录下的 `<entry_package>.jar`。
+一开始放在 `sources/` 底下，加订阅一直报「外部源载入失败」，换主机、换 MIME、
+换 jar 内容都不是原因，挪到根目录就立刻成功了。详情见 [sources/README.md](sources/README.md)。
 
 **测试会真的下载一段音频**验证能播，而不是只断言「拿到地址了」。基类把两个只有 app 才有实现的调用
 （`config()` / `notifyLoadingEpisodes()`）包成可覆写方法，所以单元测试跑的是正式解析代码本身，
