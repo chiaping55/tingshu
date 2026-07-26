@@ -35,10 +35,23 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: 跑真實請求測試
+      # 測試會對真實站點發請求，單一站點暫時逾時/限流就會紅一次。
+      # 先跑一輪，紅了隔 90 秒再跑一輪 —— 兩輪都紅才算數，
+      # 這樣「站點剛好抽風」不會變成假警報，而真的壞掉仍然抓得到。
+      - name: 跑真實請求測試(第一輪)
+        id: test1
+        continue-on-error: true
         working-directory: CustomSources
         run: |
           chmod +x gradlew
+          ./gradlew test --no-daemon
+
+      - name: 隔一段時間重跑(只在第一輪紅時)
+        if: steps.test1.outcome == 'failure'
+        working-directory: CustomSources
+        run: |
+          echo "第一輪失敗，等 90 秒排除站點暫時抽風的可能"
+          sleep 90
           ./gradlew test --no-daemon
 
       - name: 整理失敗清單
