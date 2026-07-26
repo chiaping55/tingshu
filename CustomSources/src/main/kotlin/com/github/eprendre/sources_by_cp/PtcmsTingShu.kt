@@ -178,7 +178,7 @@ abstract class PtcmsTingShu : TingShu() {
             // 只要最新几集时（列表弹窗、第一次进播放页）就用详情页自带的那一小段，
             // 不必再去请求目录页 —— 这个站限流很紧，能省一次请求就省一次。
             if (dirUrl == null || (preferBookPageEpisodesWhenPartial && !loadFullPages)) {
-                episodes.addAll(parseEpisodes(doc).reversed())
+                episodes.addAll(parseEpisodes(doc).asReversed())
             } else {
                 // 目录第一页失败时不能抛出去，否则整个播放流程跟着挂（app 会显示
                 // "当前网址解析出错了"）。退回详情页那一小段，至少还能播。
@@ -187,7 +187,7 @@ abstract class PtcmsTingShu : TingShu() {
                 } catch (e: Exception) {
                     toast("站点限流，暂时只能加载最新几集，过一会重进播放页可加载完整章节")
                     return BookDetail(
-                        parseEpisodes(doc).reversed(), intro, artist, author, 0, coverUrl
+                        parseEpisodes(doc).asReversed(), intro, artist, author, 0, coverUrl
                     )
                 }
                 episodes.addAll(parseEpisodes(firstPage))

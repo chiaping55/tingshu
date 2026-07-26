@@ -105,6 +105,13 @@ org.gradle.java.home=/path/to/jdk-17
 - **`/storages/` 路径的文件名要带音质后缀**，站点给的地址有时漏掉，直接请求回 404，补上 `-aacv2-48K` 就能播。改写只在「storages 路径且没有后缀」时才做，所以不会弄坏本来可用的地址。剩下少量 403/404 是站方文件真的没了，换 Referer 也没用（五种 Referer 都试过）。
 - **这批域名大多是互为镜像的**：ting8.cc / ting69 / ting78 / 18ting / 79ting 内容一样，leting8 / ting17 是另一套。所以只挑了两套里各一个 —— 全加进去只会让聚合搜索每本书出现四次。哪个站挂了就把 baseUrl 换成同组的镜像顶上。
 
+**别用 Java 21 才有的 SequencedCollection 方法**（`List.reversed()` / `getFirst()` /
+`getLast()` / `addFirst()` / `removeLast()` 等）。这些在安卓上**不存在**，跑到那行会
+`NoSuchMethodError` 崩掉；而且它们和 Kotlin 同名的扩展函数会撞车 —— 编译期解析到平台方法就
+悄悄埋了个雷，本机 JVM 测试甚至可能一起通过。要反转列表用 Kotlin 的 `asReversed()`。
+（v8 就是这么炸的：`parseEpisodes(doc).reversed()` 原本在很少走到的分支，
+改成爱听书的主路径之后立刻暴露。）
+
 **测试写法**
 
 基类把两个只有 app 才有实现的调用（`config()` / `notifyLoadingEpisodes()`）包成 `configure()` / `notifyLoading()`，
