@@ -3,7 +3,6 @@ package com.github.eprendre.sources_by_cp
 import com.github.eprendre.tingshu.extensions.config
 import com.github.eprendre.tingshu.extensions.getMobileUA
 import com.github.eprendre.tingshu.extensions.showToast
-import com.github.eprendre.tingshu.sources.AudioUrlExtraHeaders
 import com.github.eprendre.tingshu.sources.AudioUrlExtractor
 import com.github.eprendre.tingshu.sources.AudioUrlJsoupExtractor
 import com.github.eprendre.tingshu.sources.ISearchVerification
@@ -32,10 +31,14 @@ import java.net.URLEncoder
  * - 播放  /play/{书籍id}-{线路}-{序号}.html
  * - 音频  播放页内嵌 js 里明文写着 var now="http://....m4a"，一次请求即可，不需要 WebView
  *
+ * **不要给音频请求加 Referer。** 曾经以为喜马拉雅新 cdn 校验防盗链所以统一加上，
+ * 实测正相反：aod.cos.tx.xmcdn.com 加不加都一样，而 fdfs.xmcdn.com 一带 Referer 就回 403 ——
+ * 16 个样本里有 4 个本来能播的被这一行改成了 403。这也是听书吧可播率一度只有 48% 的主因。
+ *
  * 搜索接口有验证码闸(标题"系统安全验证")，所以实现了 [ISearchVerification]
  * 让 app 弹出页面由用户自己过一次验证；没过验证时搜索会拿到验证页，这时提示用户而不是静默失败。
  */
-abstract class DedeCmsTingShu : TingShu(), ISearchVerification, AudioUrlExtraHeaders {
+abstract class DedeCmsTingShu : TingShu(), ISearchVerification {
     /** 站点根地址，不带结尾斜杠 */
     abstract val baseUrl: String
 
@@ -143,29 +146,55 @@ abstract class DedeCmsTingShu : TingShu(), ISearchVerification, AudioUrlExtraHea
     internal fun audioUrl(playPageHtml: String): String {
         val url = Regex("""\bvar\s+now\s*=\s*"(https?://[^"]+)"""")
             .find(playPageHtml)?.groupValues?.get(1) ?: return ""
-        return withQualitySuffix(url)
+        return pickPlayable(url)
     }
 
     /**
-     * 喜马拉雅 /storages/ 下的文件名带音质后缀，站点给的地址有时漏掉，直接请求回 404。
-     * 实测补上 -aacv2-48K 就能播；地址本来就带后缀、或者不是 storages 路径的不动它，
-     * 所以这个改写只会救回原本失败的情况，不会弄坏已经可用的地址。
+     * 站点给的地址和实际能播的地址不一定一致，**逐个试过再交出去**。
+     *
+     * 喜马拉雅 /storages/ 下有些文件名带音质后缀 `-aacv2-48K`、有些不带，而站点两种都可能写错。
+     * 实测 16 个样本：原样能播 8 个，原样失败改用带后缀的又能救回 2 个 ——
+     * 而这两组之间**没有可以靠地址本身判断的规律**(同样是 /storages/…audiofreehighqps/…，
+     * 一边要后缀一边不要)，所以只能试。
+     *
+     * 代价是每集多一个几百字节的探测请求，换来的是可播率从一半提到六成以上。
+     * 都试不通就交回原地址，让 app 照常报错 —— 那种是站上的文件真的没了。
      */
-    private fun withQualitySuffix(url: String): String {
-        if (!url.contains("/storages/") || url.contains("-aacv2-")) return url
-        return url.replace(Regex("""\.(m4a|mp3)$"""), "-aacv2-48K.$1")
-    }
-
-    /**
-     * 喜马拉雅新的 cdn(aod.cos.tx.xmcdn.com)校验防盗链，不带 Referer 直接 403，
-     * 旧的 audio.xmcdn.com 不校验。这里严格判断域名再加，避免影响其它书源的音频请求。
-     */
-    override fun headers(audioUrl: String): Map<String, String> {
-        val headers = HashMap<String, String>()
-        if (audioUrl.contains("xmcdn.com")) {
-            headers["Referer"] = "$baseUrl/"
+    internal fun pickPlayable(url: String): String {
+        val candidates = ArrayList<String>()
+        candidates.add(url)
+        withQualitySuffix(url)?.let { candidates.add(it) }
+        if (candidates.size == 1) return url
+        for (candidate in candidates) {
+            if (isPlayable(candidate)) return candidate
         }
-        return headers
+        return url
+    }
+
+    /** 给可播率量测用:isPlayable 是 protected */
+    internal fun isPlayableForTest(url: String) = isPlayable(url)
+
+    /** 只读一个字节，够判断服务器认不认这个地址就行 */
+    protected open fun isPlayable(url: String): Boolean {
+        return try {
+            val response = Jsoup.connect(url)
+                .ignoreContentType(true)
+                .ignoreHttpErrors(true)
+                .header("Range", "bytes=0-1")
+                .maxBodySize(MAX_PROBE_BYTES)
+                .timeout(PROBE_TIMEOUT_MS)
+                .execute()
+            response.statusCode() in 200..299
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** 带音质后缀的那个变体；本来就带后缀、或不是 storages 路径就返回 null(没有别的变体可试) */
+    private fun withQualitySuffix(url: String): String? {
+        if (!url.contains("/storages/") || url.contains("-aacv2-")) return null
+        val suffixed = url.replace(Regex("""\.(m4a|mp3)$"""), "-aacv2-48K.$1")
+        return if (suffixed == url) null else suffixed
     }
 
     internal fun parseBooks(doc: Document): List<Book> {
@@ -198,6 +227,10 @@ abstract class DedeCmsTingShu : TingShu(), ISearchVerification, AudioUrlExtraHea
     }
 
     protected companion object {
+        /** 探测只需要头几个字节 */
+        const val MAX_PROBE_BYTES = 2048
+        const val PROBE_TIMEOUT_MS = 15000
+
         /** 这批 DedeCMS 站共用的分类编号 */
         val STANDARD_CATEGORIES = listOf(
             "1" to "玄幻",

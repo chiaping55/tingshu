@@ -26,8 +26,7 @@ class TingShuBaTest {
         assertThat(audioUrl).isNotEmpty()
         val connection = java.net.URL(audioUrl).openConnection() as java.net.HttpURLConnection
         connection.setRequestProperty("Range", "bytes=0-4096")
-        // app 播放时会带上 headers() 给的 Referer，测试也要带，否则新 cdn 回 403
-        source.headers(audioUrl).forEach { (k, v) -> connection.setRequestProperty(k, v) }
+        // 不带 Referer —— 实测 fdfs.xmcdn.com 一带就回 403(见 DedeCmsTingShu 注释)
         connection.setRequestProperty(
             "User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) " +

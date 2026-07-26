@@ -40,10 +40,8 @@ class DedeCmsSourcesTest {
             "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) " +
                 "Chrome/77.0.3865.120 Safari/537.36"
         )
-        // app 播放时会带上 headers() 给的 Referer，测试也要带，新 cdn 不带会 403
-        source.headers(audioUrl).forEach { (key, value) ->
-            connection.setRequestProperty(key, value)
-        }
+        // 不带 Referer —— 实测 fdfs.xmcdn.com 一带就回 403，aod 带不带都一样，
+        // 所以基类已经不再加这个头。测试要和 app 实际发出的请求一致。
         connection.connectTimeout = 20000
         connection.readTimeout = 20000
         val code = connection.responseCode
@@ -87,22 +85,50 @@ class DedeCmsSourcesTest {
     }
 
     /**
-     * 音质后缀改写规则：只补 storages 路径且没有后缀的，其它一律不动。
+     * 音质后缀该怎么选 —— **试过才知道**，不能凭地址判断。
+     *
+     * 喜马拉雅 /storages/ 底下有些文件带 `-aacv2-48K` 有些不带，站点两种都可能写错，
+     * 而两组地址长得一模一样。所以基类会实际探测一下再交出去。
+     * 这里把探测换成假的，验证"选哪一个"的决策本身，不依赖网络。
      */
     @Test
-    fun addsQualitySuffixOnlyWhenNeeded() {
-        val prefix = "var now="
-        fun extract(url: String) = sites.first().audioUrl("$prefix\"$url\";")
+    fun picksWhicheverVariantTheServerAccepts() {
+        val storages = "https://aod.cos.tx.xmcdn.com/storages/1a11-x/12/D1/AAA.m4a"
+        val suffixed = "https://aod.cos.tx.xmcdn.com/storages/1a11-x/12/D1/AAA-aacv2-48K.m4a"
 
-        // storages 且无后缀 -> 补上，否则站点回 404
-        assertThat(extract("https://aod.cos.tx.xmcdn.com/storages/1a11-x/12/D1/AAA.m4a"))
-            .isEqualTo("https://aod.cos.tx.xmcdn.com/storages/1a11-x/12/D1/AAA-aacv2-48K.m4a")
-        // 已经带后缀 -> 不动
-        assertThat(extract("https://aod.cos.tx.xmcdn.com/storages/1a11-x/12/D1/AAA-aacv2-48K.m4a"))
-            .isEqualTo("https://aod.cos.tx.xmcdn.com/storages/1a11-x/12/D1/AAA-aacv2-48K.m4a")
-        // group 路径 -> 不动
-        assertThat(extract("http://aod.cos.tx.xmcdn.com/group75/M09/99/AAA.m4a"))
-            .isEqualTo("http://aod.cos.tx.xmcdn.com/group75/M09/99/AAA.m4a")
+        // 只有带后缀的能播 -> 用带后缀的
+        assertThat(probeSite { it == suffixed }.pickPlayable(storages)).isEqualTo(suffixed)
+        // 只有原地址能播 -> 保持原样(旧版无条件补后缀，这一种会被改坏)
+        assertThat(probeSite { it == storages }.pickPlayable(storages)).isEqualTo(storages)
+        // 两个都不行 -> 交回原地址，让 app 照常报错(站上文件真没了)
+        assertThat(probeSite { false }.pickPlayable(storages)).isEqualTo(storages)
+    }
+
+    /**
+     * 没有别的变体可试时不该浪费一个探测请求 —— 每集都多打一次是有代价的。
+     */
+    @Test
+    fun doesNotProbeWhenThereIsNoAlternative() {
+        val probed = ArrayList<String>()
+        val site = probeSite { probed.add(it); true }
+        // group 路径不适用音质后缀
+        val group = "http://aod.cos.tx.xmcdn.com/group75/M09/99/AAA.m4a"
+        assertThat(site.pickPlayable(group)).isEqualTo(group)
+        // 本来就带后缀了
+        val already = "https://aod.cos.tx.xmcdn.com/storages/1a11-x/12/D1/AAA-aacv2-48K.m4a"
+        assertThat(site.pickPlayable(already)).isEqualTo(already)
+        assertThat(probed.isEmpty()).isTrue()
+    }
+
+    /** 探测结果由测试指定的假规则决定，不发真实请求 */
+    private fun probeSite(accept: (String) -> Boolean) = object : DedeCmsTingShu() {
+        override val baseUrl = "https://www.ting8.cc"
+        override val categoryPath = "books"
+        override val bookPath = "mp3"
+        override fun getSourceId() = "probe"
+        override fun getName() = "probe"
+        override fun configure(connection: Connection): Connection = connection.testConfig(true)
+        override fun isPlayable(url: String) = accept(url)
     }
 
     /**

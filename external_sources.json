@@ -1,7 +1,7 @@
 {
-  "version": 12,
+  "version": 13,
   "entry_package": "sources_by_cp",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp.jar",
-  "update_msg": "新增麒麟听书(70ts.com)：书多、更新勤，音频在蜻蜓FM 上，和其它源的片源不同，同一本书可能是另一个演播版本。",
+  "update_msg": "听书吧、乐听吧的可播率从 48%/40% 提到约 60% —— 之前失败的一部分是我们自己加的 Referer 造成的(反而让 CDN 回 403)。",
   "support_url": ""
 }
