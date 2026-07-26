@@ -1,7 +1,7 @@
 {
-  "version": 7,
+  "version": 8,
   "entry_package": "sources_by_cp",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp.jar",
-  "update_msg": "爱听书的章节目录改走手机站，避免翻目录把桌面站额度用光、连别的书都读不出来。",
+  "update_msg": "爱听书:浏览与进播放页不再额外请求目录页，目录被限流时退回最新几集而不是整个播放失败。",
   "support_url": ""
 }

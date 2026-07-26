@@ -119,6 +119,15 @@ abstract class PtcmsTingShu : TingShu() {
     protected open val episodeDirectoryUserAgent: String? = null
 
     /**
+     * 只要最新几集时（列表弹窗、第一次进播放页）是否直接用详情页自带的那一小段，
+     * 不去请求目录页。
+     *
+     * 默认 false —— 起点系限流宽松，照常抓目录页第一页，章节顺序也更完整。
+     * 只有像爱听书那种限流很紧的站才打开，省下的每一次请求都要紧。
+     */
+    protected open val preferBookPageEpisodesWhenPartial: Boolean = false
+
+    /**
      * 翻章节目录时每页之间的等待区间。有的站限流比较严(爱听书连翻会回 429)，
      * 这种站要放慢，否则退避重试会让整体更慢。
      */
@@ -166,10 +175,21 @@ abstract class PtcmsTingShu : TingShu() {
         if (loadEpisodes) {
             // 详情页只列最新几集且是倒序，完整章节在 a.dirurl 指向的目录页。
             val dirUrl = doc.selectFirst("a.dirurl")?.absUrl("href")
-            if (dirUrl == null) {
+            // 只要最新几集时（列表弹窗、第一次进播放页）就用详情页自带的那一小段，
+            // 不必再去请求目录页 —— 这个站限流很紧，能省一次请求就省一次。
+            if (dirUrl == null || (preferBookPageEpisodesWhenPartial && !loadFullPages)) {
                 episodes.addAll(parseEpisodes(doc).reversed())
             } else {
-                val firstPage = fetch(directoryPageUrl(dirUrl, 1), bookUrl, episodeDirectoryUserAgent)
+                // 目录第一页失败时不能抛出去，否则整个播放流程跟着挂（app 会显示
+                // "当前网址解析出错了"）。退回详情页那一小段，至少还能播。
+                val firstPage = try {
+                    fetch(directoryPageUrl(dirUrl, 1), bookUrl, episodeDirectoryUserAgent)
+                } catch (e: Exception) {
+                    toast("站点限流，暂时只能加载最新几集，过一会重进播放页可加载完整章节")
+                    return BookDetail(
+                        parseEpisodes(doc).reversed(), intro, artist, author, 0, coverUrl
+                    )
+                }
                 episodes.addAll(parseEpisodes(firstPage))
                 val totalPage = parseEpisodeTotalPage(firstPage)
                 if (loadFullPages && totalPage > 1) {

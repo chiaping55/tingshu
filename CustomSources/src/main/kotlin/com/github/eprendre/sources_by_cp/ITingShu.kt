@@ -63,6 +63,12 @@ object ITingShu : PtcmsTingShu() {
         "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
 
+    /**
+     * 这个站限流很紧，列表弹窗与第一次进播放页就用详情页自带的最新几集，
+     * 不额外请求目录页 —— 实测目录页被限流时会让整个播放流程失败。
+     */
+    override val preferBookPageEpisodesWhenPartial = true
+
     /** 章节目录连着翻还是客气一点 */
     override val episodePageDelay = 400L..900L
 
