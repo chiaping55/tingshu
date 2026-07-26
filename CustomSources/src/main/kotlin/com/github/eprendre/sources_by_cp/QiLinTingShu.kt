@@ -50,10 +50,9 @@ object QiLinTingShu : PtcmsTingShu() {
 
     override fun getName() = "麒麟听书"
 
-    override fun getDesc() = "书多、更新勤，音频在蜻蜓FM 上，和其它源的片源不同，" +
-        "同一本书可能是另一个演播版本。\n" +
-        "站点对取音频地址有风控：连着快速切集会暂时不给地址，" +
-        "过一会就好，不是源坏了。"
+    override fun getDesc() = "推荐指数:4星 ⭐⭐⭐⭐\n" +
+        "书多、更新勤，和其它源的片源不同，同一本书常是另一个演播版本。\n" +
+        "连着快速切集会暂时取不到音频，等一两分钟就好，不是源坏了。"
 
     /** 搜索路径带 /so/ 前缀，其余参数和起点系一样 */
     override fun search(keywords: String, page: Int): Pair<List<Book>, Int> {

@@ -37,8 +37,8 @@ object ITingShu : PtcmsTingShu() {
 
     override fun getDesc() =
         "推荐指数:5星 ⭐⭐⭐⭐⭐\n" +
-            "近年的多人有声剧收录得最全。音频要靠 WebView 嗅探，所以打开播放页会慢一点，" +
-            "手表等没有 WebView 的设备用不了这个源。"
+            "近年的多人有声剧收录得最全。\n" +
+            "打开播放页会多等几秒(音频要经内置浏览器加载)，手表等设备用不了这个源。"
 
     /** 音频靠 WebView 嗅探，所以这个源需要 WebView */
     override fun isWebViewNotRequired() = false

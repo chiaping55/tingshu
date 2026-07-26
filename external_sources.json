@@ -1,7 +1,7 @@
 {
-  "version": 16,
+  "version": 17,
   "entry_package": "sources_by_cp",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp.jar",
-  "update_msg": "ting15 搜索能翻页了;听书吧/乐听吧的简介不再黏上侧栏推荐文案、音质后缀多救一批音频。乐听吧的说明改诚实:它和听书吧其实是同一份书库。",
+  "update_msg": "书源介绍改成一句话说清楚:能听什么、遇到问题怎么办。",
   "support_url": ""
 }
