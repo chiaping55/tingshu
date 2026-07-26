@@ -104,6 +104,12 @@ class QiDianYouShengTest {
         val type = connection.contentType
         val bytes = connection.inputStream.use { it.readBytes().size }
         println("  播放测试: HTTP $code $type ${bytes}B")
+        // 必须断言 Content-Type —— 站点故障时会回 200 的 HTML 错误页，
+        // 只看状态码和字节数的话那也算"能播"，等于测不出坏掉的地址
+        val ct = type
+        val isAudio = ct != null && (ct.startsWith("audio") || ct.contains("mp4") ||
+            ct.contains("octet-stream"))
+        assertThat(isAudio).isTrue()
         connection.disconnect()
         assertThat(code in 200..299).isTrue()
         assertThat(bytes > 0).isTrue()

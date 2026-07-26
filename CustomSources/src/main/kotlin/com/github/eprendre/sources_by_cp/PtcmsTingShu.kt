@@ -78,14 +78,36 @@ abstract class PtcmsTingShu : TingShu() {
     }
 
     internal fun fetch(url: String, referer: String? = null, ua: String? = null): Document =
-        guard.request { connect(url, referer, ua) }.parse()
+        checkNotThrottled(guard.request { connect(url, referer, ua) }.parse())
 
     internal fun fetchHtml(url: String, referer: String? = null): String =
         guard.request { connect(url, referer, null) }.body()
 
     /** 有些站的搜索是 POST 表单 */
     internal fun fetchPost(url: String, data: Map<String, String>, referer: String? = null): Document =
-        guard.request { connect(url, referer, null).method(Connection.Method.POST).data(data) }.parse()
+        checkNotThrottled(
+            guard.request {
+                connect(url, referer, null).method(Connection.Method.POST).data(data)
+            }.parse()
+        )
+
+    /**
+     * 限流有时回的是 **HTTP 200** 的「访问过于频繁」提示页，不是 429。
+     *
+     * 这个检查以前只做在翻章节那个循环里，所以书籍页、搜索、目录第一页拿到提示页时
+     * 会被当成正常内容解析 —— 结果是「这本书没有章节」「搜索没结果」，
+     * 使用者完全看不出是限流。现在挪到 [fetch] 里，所有请求都过一遍。
+     *
+     * 判断加了长度上限：提示页只有几百字，而真实的书籍页有几千字。
+     * 只比对关键词的话，简介里恰好提到「稍后再试」的书会被误判成限流。
+     */
+    private fun checkNotThrottled(doc: Document): Document {
+        val text = doc.body()?.text() ?: return doc
+        if (text.length <= INTERSTITIAL_MAX_CHARS && THROTTLE_HINTS.any { text.contains(it) }) {
+            throw IOException("站点提示访问过于频繁，请过一会再试")
+        }
+        return doc
+    }
 
     /** 把目录页地址换到 [episodeDirectoryBaseUrl]（没设就原样返回） */
     internal fun directoryPageUrl(dirUrl: String, page: Int): String =
@@ -445,6 +467,9 @@ abstract class PtcmsTingShu : TingShu() {
     protected companion object {
         private val AUDIO_SUFFIXES = listOf(".mp3", ".m4a", ".aac", ".m4s", ".wav")
         private val THROTTLE_HINTS = listOf("过于频繁", "訪問過於頻繁", "稍后再试", "稍後再試")
+
+        /** 提示页只有几百字，真实书籍页有几千字 —— 用长度把两者分开，避免误判 */
+        private const val INTERSTITIAL_MAX_CHARS = 600
 
         /**
          * 默认线路拿不到地址时依次尝试的线路号。

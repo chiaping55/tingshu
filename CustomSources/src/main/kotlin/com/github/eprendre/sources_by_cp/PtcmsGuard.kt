@@ -38,19 +38,35 @@ internal class PtcmsGuard {
     /**
      * 有的站会限流(爱听书连续翻章节目录就会回 429)，退避重试。
      *
-     * 重试用尽后**必须抛出**，不能把错误页当正常内容交回去 —— 那样解析不到东西会变成
-     * 「这本书没有章节」，把限流伪装成内容缺失，排查时会往完全错误的方向找。
+     * **任何失败都必须抛出，不能把错误页当正常内容交回去。** 那样解析不到东西会变成
+     * 「这本书没有章节」，把故障伪装成内容缺失，排查时会往完全错误的方向找。
      * 调用方要的话可以自己接住(见 PtcmsTingShu 翻页时的处理:保留已抓到的部分)。
+     *
+     * 这里踩过两次同一个坑：
+     * 1. 一开始 429 也不抛，限流被当成「这本书没有章节」；
+     * 2. 修好 429 之后，`ignoreHttpErrors(true)` 让 404/500/502 照旧被当成正常页面交回去 ——
+     *    而且因为不抛异常，`fetchDirectoryPage` 那条「手机站失败就退回桌面站」的退路
+     *    根本不会触发(它是靠 catch 异常启动的)，等于整段白写。
+     * 所以现在的规则是：**只有 2xx 才算成功**。ignoreHttpErrors 仍然要开，
+     * 否则拿不到状态码去分辨是限流还是别的错误。
      */
     private fun execute(build: () -> Connection): Connection.Response {
         var wait = FIRST_BACKOFF_MS
-        repeat(MAX_RETRY) {
+        repeat(MAX_RETRY) { attempt ->
             val response = build().cookies(cookies).ignoreHttpErrors(true).execute()
-            if (response.statusCode() != TOO_MANY_REQUESTS) {
+            val status = response.statusCode()
+            if (status in 200..299) {
                 return response
             }
-            Thread.sleep(wait)
-            wait *= 2
+            if (status != TOO_MANY_REQUESTS) {
+                // 不是限流就没必要退避重试(404 再等也是 404)，直接抛出去
+                throw IOException("站点返回 HTTP $status，这不是限流，可能改版或临时故障")
+            }
+            // 最后一次尝试之后不必再等 —— 等完还是要抛，那 12 秒纯粹是让用户多看 12 秒转圈
+            if (attempt < MAX_RETRY - 1) {
+                Thread.sleep(wait)
+                wait *= 2
+            }
         }
         throw IOException("站点限流(429)，退避重试 $MAX_RETRY 次仍被拒绝，请过一会再试")
     }

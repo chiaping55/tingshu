@@ -4,7 +4,7 @@ import com.github.eprendre.tingshu.extensions.config
 import com.github.eprendre.tingshu.extensions.getMobileUA
 import com.github.eprendre.tingshu.extensions.showToast
 import com.github.eprendre.tingshu.sources.AudioUrlExtractor
-import com.github.eprendre.tingshu.sources.AudioUrlJsoupExtractor
+import com.github.eprendre.tingshu.sources.AudioUrlCustomExtractor
 import com.github.eprendre.tingshu.sources.ISearchVerification
 import com.github.eprendre.tingshu.sources.TingShu
 import com.github.eprendre.tingshu.utils.Book
@@ -60,6 +60,16 @@ abstract class DedeCmsTingShu : TingShu(), ISearchVerification {
 
     protected open fun configure(connection: Connection): Connection = connection.config(true)
 
+    /**
+     * app 里弹提示；测试覆写成打印。
+     *
+     * PtcmsTingShu 和 GxlCmsTingShu 都有这层，这里以前漏了 —— 结果 search() 一走到
+     * 「站点要求先过一次安全验证」那条就直接呼叫 showToast stub 抛异常，
+     * 在 JVM 上根本没法测。而这两个站的验证闸目前是**常开**的
+     * (search.php 一律回「系统安全验证」)，所以是必定踩到、不是偶发。
+     */
+    protected open fun toast(message: String) = showToast(message)
+
     private fun fetch(url: String, referer: String? = null): Document {
         val connection = configure(Jsoup.connect(url))
         if (referer != null) {
@@ -82,7 +92,7 @@ abstract class DedeCmsTingShu : TingShu(), ISearchVerification {
     override fun search(keywords: String, page: Int): Pair<List<Book>, Int> {
         val doc = fetch(searchUrl(keywords), "$baseUrl/")
         if (isVerificationPage(doc)) {
-            showToast("站点要求先过一次安全验证，请在弹出的页面完成后重试")
+            toast("站点要求先过一次安全验证，请在弹出的页面完成后重试")
             return Pair(emptyList(), 1)
         }
         return Pair(parseBooks(doc), 1)// 搜索结果不分页
@@ -134,10 +144,25 @@ abstract class DedeCmsTingShu : TingShu(), ISearchVerification {
         return BookDetail(episodes, intro, artist, author, episodes.size, coverUrl)
     }
 
+    /**
+     * 用 [AudioUrlCustomExtractor] 而不是 [AudioUrlJsoupExtractor]。
+     *
+     * 差别在于**允不允许在里面发网络请求**：Jsoup 那个的契约写明 lambda 是"处理返回的 Document"，
+     * 纯解析，没有保证跑在哪个线程上；而 Custom 那个的契约是"传入章节地址，解析后传出音频地址"，
+     * 自己取页面本来就是它的活(PtcmsTingShu 一直这么用，实机验证过)。
+     *
+     * 这里需要发请求是因为 [pickPlayable] 要探测哪个音质后缀能播。
+     * 放在 Jsoup 那个里面的话，万一它在主线程上跑就会 NetworkOnMainThreadException ——
+     * 虽然会被 catch 住退回原地址、不至于崩，但会变成不同机型行为不一致，将来很难查。
+     */
     override fun getAudioUrlExtractor(): AudioUrlExtractor {
-        AudioUrlJsoupExtractor.setUp(true) { doc -> audioUrl(doc.html()) }
-        return AudioUrlJsoupExtractor
+        AudioUrlCustomExtractor.setUp { chapterUrl -> resolveAudioUrl(chapterUrl) }
+        return AudioUrlCustomExtractor
     }
+
+    /** 取章节页 → 解出音频地址(含探测哪个后缀能播) */
+    internal fun resolveAudioUrl(chapterUrl: String): String =
+        audioUrl(fetch(chapterUrl, "$baseUrl/").html())
 
     /**
      * 播放页的内嵌 js: var now="http://audio.xmcdn.com/....m4a"; var next="…"。

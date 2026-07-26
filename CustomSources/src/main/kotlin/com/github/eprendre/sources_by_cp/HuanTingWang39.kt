@@ -19,7 +19,14 @@ object HuanTingWang39 : PtcmsTingShu() {
 
     override fun getName() = "幻听网"
 
-    override fun getDesc() = "推荐指数:5星 ⭐⭐⭐⭐⭐\n和 22听书(一夜幻听)同品牌但没有 cloudflare 拦截，可正常搜索。"
+    override fun getDesc() =
+        "推荐指数:4星 ⭐⭐⭐⭐\n" +
+            "书目和起点有声网大量重复 —— 两个域名解析到同一台服务器，" +
+            "所以聚合搜索里同一本书会出现两次，而且两个源共用同一份限流额度" +
+            "(在这个源连翻章节，起点有声网也会跟着变慢)。\n" +
+            "留着它是当起点有声网那个域名被墙或改版时的备用入口；" +
+            "平常优先用起点有声网就好，没必要两个都开。\n" +
+            "音频是直链，实测可播率约 95%。"
 
     override fun getCategoryMenus(): List<CategoryMenu> {
         return listOf(

@@ -1,7 +1,7 @@
 {
-  "version": 13,
+  "version": 14,
   "entry_package": "sources_by_cp",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp.jar",
-  "update_msg": "听书吧、乐听吧的可播率从 48%/40% 提到约 60% —— 之前失败的一部分是我们自己加的 Referer 造成的(反而让 CDN 回 403)。",
+  "update_msg": "站点出错时不再伪装成「这本书没有章节」—— 404/500/502 和 HTTP 200 的限流提示页现在都会明确报错让你重试。",
   "support_url": ""
 }
