@@ -37,6 +37,9 @@ https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.jso
 
 除爱听书外,所有書源的音頻都是 mp3/m4a 直鏈,不需要 WebView,手錶等裝置也能用。
 
+**用繁體字搜尋也搜得到。** 這些站的書庫全是簡體建的,直接打繁體(例如「劍來」「聖墟」)
+往往一本都搜不到 —— 現在每個源在送出查詢前會自動把關鍵詞轉成簡體,繁簡輸入都能搜到書。
+
 **這個訂閱有人在顧嗎?** 有。倉庫設了[每週自動健康檢查](.github/workflows/health-check.yml) ——
 測試會對每個站發真實請求、實際下載一段音頻,站掛了會自動通知,不必等到你想聽的時候才發現。
 
