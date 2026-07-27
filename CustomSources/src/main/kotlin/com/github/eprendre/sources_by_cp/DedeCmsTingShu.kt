@@ -98,8 +98,9 @@ abstract class DedeCmsTingShu : TingShu(), ISearchVerification {
         return Pair(parseBooks(doc), 1)// 搜索结果不分页
     }
 
+    // 转简体再搜:站方库是简体的，繁体会命中归零。放这里让 search 和验证页 callback 都受益
     private fun searchUrl(keywords: String) =
-        "$baseUrl/search.php?searchword=${URLEncoder.encode(keywords, "UTF-8")}"
+        "$baseUrl/search.php?searchword=${URLEncoder.encode(ChineseConverter.toSimplified(keywords), "UTF-8")}"
 
     private fun isVerificationPage(doc: Document) = doc.title().contains("安全验证")
 

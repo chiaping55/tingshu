@@ -224,8 +224,9 @@ abstract class PtcmsTingShu : TingShu() {
     protected open val audioRequiresSignedUrl: Boolean = false
 
     override fun search(keywords: String, page: Int): Pair<List<Book>, Int> {
+        // 站方数据库是简体的，繁体输入会字面对不上、命中率归零 —— 先转简体再搜
         val url = "$baseUrl/search.html?searchtype=name" +
-            "&searchword=${URLEncoder.encode(keywords, "UTF-8")}&page=$page"
+            "&searchword=${URLEncoder.encode(ChineseConverter.toSimplified(keywords), "UTF-8")}&page=$page"
         val doc = fetch(url, "$baseUrl/")
         return Pair(parseBooks(doc), parseTotalPage(doc, page))
     }

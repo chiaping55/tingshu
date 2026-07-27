@@ -57,7 +57,7 @@ object QiLinTingShu : PtcmsTingShu() {
     /** 搜索路径带 /so/ 前缀，其余参数和起点系一样 */
     override fun search(keywords: String, page: Int): Pair<List<Book>, Int> {
         val url = "$baseUrl/so/search.html?searchtype=name" +
-            "&searchword=${URLEncoder.encode(keywords, "UTF-8")}&page=$page"
+            "&searchword=${URLEncoder.encode(ChineseConverter.toSimplified(keywords), "UTF-8")}&page=$page"
         val doc = fetch(url, "$baseUrl/")
         return Pair(parseBooks(doc), parseTotalPage(doc, page))
     }

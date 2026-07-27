@@ -91,13 +91,15 @@ abstract class GxlCmsTingShu : TingShu(), AudioUrlExtraHeaders {
      * 同样的错在爱听书那个源上也犯过一次:**别假设搜索不分页，去看分页栏**。
      */
     override fun search(keywords: String, page: Int): Pair<List<Book>, Int> {
+        // 站方库是简体的，繁体输入命中率归零 —— 先转简体(含第 2 页起的 searchPageUrl)
+        val kw = ChineseConverter.toSimplified(keywords)
         val doc = if (page <= 1) {
             connect("$baseUrl$searchPath", "$baseUrl/")
                 .method(Connection.Method.POST)
-                .data("wd", keywords)
+                .data("wd", kw)
                 .post()
         } else {
-            fetch(searchPageUrl(keywords, page), "$baseUrl/")
+            fetch(searchPageUrl(kw, page), "$baseUrl/")
         }
         return Pair(parseBooks(doc), parseSearchTotalPage(doc, page))
     }

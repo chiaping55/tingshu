@@ -86,14 +86,16 @@ object ITingShu : PtcmsTingShu() {
      * 全都搜不到，而使用者只会以为这个源没收录。
      */
     override fun search(keywords: String, page: Int): Pair<List<Book>, Int> {
+        // 站方库是简体的，繁体输入命中率归零 —— 先转简体(含第 2 页起的 searchPageUrl)
+        val kw = ChineseConverter.toSimplified(keywords)
         val doc = if (page <= 1) {
             fetchPost(
                 "$baseUrl/novelsearch/search/result.html",
-                mapOf("searchword" to keywords),
+                mapOf("searchword" to kw),
                 "$baseUrl/"
             )
         } else {
-            fetch(searchPageUrl(keywords, page), "$baseUrl/")
+            fetch(searchPageUrl(kw, page), "$baseUrl/")
         }
         return Pair(parseBooks(doc), parseTotalPage(doc, page))
     }
