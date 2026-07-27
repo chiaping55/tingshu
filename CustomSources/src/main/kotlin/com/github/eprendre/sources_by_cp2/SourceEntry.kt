@@ -1,4 +1,4 @@
-package com.github.eprendre.sources_by_cp
+package com.github.eprendre.sources_by_cp2
 
 import com.github.eprendre.tingshu.sources.TingShu
 

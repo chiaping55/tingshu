@@ -1,4 +1,4 @@
-package com.github.eprendre.sources_by_cp
+package com.github.eprendre.sources_by_cp2
 
 /**
  * 乐听吧 https://www.leting8.com

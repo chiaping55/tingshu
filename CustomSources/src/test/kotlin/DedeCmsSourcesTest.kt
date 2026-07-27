@@ -3,7 +3,7 @@ import assertk.assertions.isEqualTo
 import assertk.assertions.isGreaterThan
 import assertk.assertions.isNotEmpty
 import assertk.assertions.isTrue
-import com.github.eprendre.sources_by_cp.DedeCmsTingShu
+import com.github.eprendre.sources_by_cp2.DedeCmsTingShu
 import org.jsoup.Connection
 import org.jsoup.Jsoup
 import org.junit.Test

@@ -1,4 +1,4 @@
-package com.github.eprendre.sources_by_cp
+package com.github.eprendre.sources_by_cp2
 
 /**
  * 有听网 (www.ting15.com) —— 站方自称「有听网」，别和同族的**恋听网 ting55.com** 搞混，

@@ -3,7 +3,7 @@ import assertk.assertions.isEqualTo
 import assertk.assertions.isGreaterThan
 import assertk.assertions.isNotEmpty
 import assertk.assertions.isTrue
-import com.github.eprendre.sources_by_cp.PtcmsTingShu
+import com.github.eprendre.sources_by_cp2.PtcmsTingShu
 import com.github.eprendre.tingshu.utils.Book
 import com.github.eprendre.tingshu.utils.CategoryMenu
 import com.github.eprendre.tingshu.utils.CategoryTab

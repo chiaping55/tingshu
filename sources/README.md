@@ -1,4 +1,4 @@
-# 自维护听书源 sources_by_cp
+# 自维护听书源 sources_by_cp2
 
 给「我的听书」app 用的外置源。官方 `wdts.top` 的订阅端点已全部失效（返回 HTTP 526），这里是自己接手维护的一份。
 
@@ -24,14 +24,14 @@ MIME（`application/json` vs `text/plain`）、把 jar 换成早先验证可用�
 也确认过手机浏览器能打开那个网址、订阅记录里没有残留项 —— 全都不是原因。
 把 json 和 jar 一起挪到根目录、命名照抄社区能用的那两个订阅之后，一次就成功。
 
-所以改这个项目时记住：**`sources_by_cp.jar` 与 `external_sources.json` 要一起待在根目录**，
+所以改这个项目时记住：**`sources_by_cp2.jar` 与 `external_sources.json` 要一起待在根目录**，
 别为了整齐把它们收进子文件夹。
 
 ## 手动导入（订阅连不上时）
 
 ```bash
-adb push sources_by_cp.jar /sdcard/Android/data/com.github.eprendre.tingshu/files/jars/
-adb shell chmod 444 /sdcard/Android/data/com.github.eprendre.tingshu/files/jars/sources_by_cp.jar
+adb push sources_by_cp2.jar /sdcard/Android/data/com.github.eprendre.tingshu/files/jars/
+adb shell chmod 444 /sdcard/Android/data/com.github.eprendre.tingshu/files/jars/sources_by_cp2.jar
 ```
 
 放进去后重启 app，再去 **设置 → 选择源站点** 把源勾上 —— app 会记住旧的勾选状态，新源默认是关闭的。
@@ -65,8 +65,8 @@ DedeCMS 两站是从站方完整索引（`/xml/rss.xml`，各约 2 万笔）里*
 URL 编码中文路径（主机本身连不上）、切换线路（`/play/{书}-{线路}-{集}` 的线路 1~4 全是空的，
 DedeCMS 只有单线路 —— 这点和 PTCMS 不同，PTCMS 的线路备援正是它能到 95% 的原因）。
 
-两套模板各自有基类（[PtcmsTingShu](../CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/PtcmsTingShu.kt) /
-[DedeCmsTingShu](../CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/DedeCmsTingShu.kt)），
+两套模板各自有基类（[PtcmsTingShu](../CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp2/PtcmsTingShu.kt) /
+[DedeCmsTingShu](../CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp2/DedeCmsTingShu.kt)），
 加同模板的站点只需要填 baseUrl 和分类清单。
 
 ## 开发
@@ -74,7 +74,7 @@ DedeCMS 只有单线路 —— 这点和 PTCMS 不同，PTCMS 的线路备援正
 ```bash
 cd CustomSources
 ./gradlew test    # 测试会发真实网络请求，并下载一段音频确认能播
-./gradlew jar     # 产出 build/libs/sources_by_cp.jar
+./gradlew jar     # 产出 build/libs/sources_by_cp2.jar
 ```
 
 需要 JDK 17 跑 gradle（gradle 8.0 不支持 JDK 21+）。本机默认 JDK 不是 17 时，在 `~/.gradle/gradle.properties` 里加：
@@ -93,7 +93,7 @@ org.gradle.java.home=/path/to/jdk-17
 - **音频地址分两段存**：`urlXXX` 是主体、`murlXXX` 是扩展名。有些线路给的主体不带扩展名，不接上 cdn 直接回 403。
 - **默认线路经常是空的**：player.html 的 `site` 参数是线路号，站点默认那条对不少章节返回空字符串，要换其它线路重试。
 - **章节目录页的 hash 每次请求都变**，不能写死，要从详情页的 `a.dirurl` 现取。
-- **反爬挑战的 cookie 名称各站不同**：起点系是 `pt_guid`，爱听书是 `__51guid__`，写法也不一样（一种先拼变量再赋值、一种直接赋值）。[PtcmsGuard](../CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/PtcmsGuard.kt) 从解开的脚本里自己读名称，所以一份逻辑吃两种站，站方改名也不用动代码。
+- **反爬挑战的 cookie 名称各站不同**：起点系是 `pt_guid`，爱听书是 `__51guid__`，写法也不一样（一种先拼变量再赋值、一种直接赋值）。[PtcmsGuard](../CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp2/PtcmsGuard.kt) 从解开的脚本里自己读名称，所以一份逻辑吃两种站，站方改名也不用动代码。
 - **有的站拿 UA 当风控**：爱听书用 Chrome 77（repo 里 `testConfig` 写死的那个，2019 年）请求章节目录页直接回 429，而书籍页照样放行 —— 症状看起来完全像限流，查了半天才发现换个新 UA 就好。这类站要在源里指定 UA，不能依赖用户的 app 设置。
 - **限流要能分辨**：429 退避重试用尽后必须抛异常，不能把错误页当内容返回 —— 那样解析不到东西会变成"这本书没有章节"，把限流伪装成内容缺失。章节翻页时接住这个异常、保留已抓到的部分并提示用户。
 

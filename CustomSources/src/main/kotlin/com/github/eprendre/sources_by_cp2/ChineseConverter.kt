@@ -1,4 +1,4 @@
-package com.github.eprendre.sources_by_cp
+package com.github.eprendre.sources_by_cp2
 
 /**
  * 繁体 → 简体 单字转换。

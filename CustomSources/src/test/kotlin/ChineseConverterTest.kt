@@ -1,6 +1,6 @@
 import assertk.assertThat
 import assertk.assertions.isEqualTo
-import com.github.eprendre.sources_by_cp.ChineseConverter
+import com.github.eprendre.sources_by_cp2.ChineseConverter
 import org.junit.Test
 
 /**

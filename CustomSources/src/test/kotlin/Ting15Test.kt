@@ -4,7 +4,7 @@ import assertk.assertions.isFalse
 import assertk.assertions.isGreaterThan
 import assertk.assertions.isNotEmpty
 import assertk.assertions.isTrue
-import com.github.eprendre.sources_by_cp.GxlCmsTingShu
+import com.github.eprendre.sources_by_cp2.GxlCmsTingShu
 import org.jsoup.Connection
 import org.junit.Test
 

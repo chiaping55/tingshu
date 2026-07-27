@@ -1,7 +1,7 @@
 {
-  "version": 19,
-  "entry_package": "sources_by_cp",
-  "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp.jar",
+  "version": 20,
+  "entry_package": "sources_by_cp2",
+  "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp2.jar",
   "update_msg": "现在用繁体字也能搜到书了 —— 搜索时会自动把关键词转成简体。这些站的书库都是简体建的，以前打繁体常常一本都搜不到。",
   "support_url": ""
 }

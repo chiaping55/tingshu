@@ -51,20 +51,20 @@ https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.jso
 ## 給想自己寫書源的人
 
 這個 fork 除了訂閱檔,也整理了一套比上游範例更省力的寫源框架,程式碼都在
-[CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/)。
+[CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp2/](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp2/)。
 
 ### 按建站模板抽成基類
 
 中文聽書站大多用同一批建站程式架的,同一模板的站點只差域名和路徑。這裡把三個常見模板
 各抽成一個基類,**加同族站點只需要填 baseUrl、分類代號和 sourceId**:
 
-- [PtcmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/PtcmsTingShu.kt)
+- [PtcmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp2/PtcmsTingShu.kt)
   —— PTCMS 站群。處理反爬 cookie 握手、分頁章節目錄、音頻地址拼接與線路重試。
   同族站之間的差異做成開關:章節目錄在獨立頁還是書頁本身、目錄頁走不走手機站、
   支不支援換線路、音頻後綴取 murl 還是播放器裡那段拼接
-- [DedeCmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/DedeCmsTingShu.kt)
+- [DedeCmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp2/DedeCmsTingShu.kt)
   —— DedeCMS(織夢)站群。處理路徑段差異、喜馬拉雅 CDN 的防盜鏈與音質後綴
-- [GxlCmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp/GxlCmsTingShu.kt)
+- [GxlCmsTingShu.kt](CustomSources/src/main/kotlin/com/github/eprendre/sources_by_cp2/GxlCmsTingShu.kt)
   —— GXLCMS 家族。音頻靠 POST 換 JSON 拿直鏈,處理 unicode 轉義還原、非 ASCII 路徑的
   百分號編碼,以及取址接口的狀態語義(限流/缺章/付費要分清)
 
@@ -77,7 +77,7 @@ https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.jso
 
 ### 訂閱檔的擺放規則(重要)
 
-`external_sources.json` 和編譯好的 `sources_by_cp.jar` 必須放在**同一層目錄**
+`external_sources.json` 和編譯好的 `sources_by_cp2.jar` 必須放在**同一層目錄**
 (這個倉庫放在根目錄)。app 並不按 JSON 裡的 `download_url` 抓 jar,而是按訂閱 JSON
 所在的位置推算同目錄下的 `<entry_package>.jar` —— 放進子目錄訂閱會一直報
 「外部源載入失敗」,而且錯誤訊息完全看不出原因。
@@ -90,7 +90,7 @@ https://raw.githubusercontent.com/chiaping55/tingshu/master/external_sources.jso
 - bytecode 鎖定 Java 8 —— 倉庫自帶的 d8 認不得新版 class file,**也別用 Java 21 才有的
   API**(如 `List.reversed()`),Android 上不存在,而且會和 Kotlin 同名擴充函式撞名,
   本機測試照樣通過、上了手機才崩
-- 建置:`./gradlew jar`,產物在 `build/libs/sources_by_cp.jar`
+- 建置:`./gradlew jar`,產物在 `build/libs/sources_by_cp2.jar`
 
 更多維護筆記(各站反爬型態、限流行為、除錯教訓)在 [sources/README.md](sources/README.md)。
 
