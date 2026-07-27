@@ -228,7 +228,10 @@ abstract class PtcmsTingShu : TingShu() {
         val url = "$baseUrl/search.html?searchtype=name" +
             "&searchword=${URLEncoder.encode(ChineseConverter.toSimplified(keywords), "UTF-8")}&page=$page"
         val doc = fetch(url, "$baseUrl/")
-        return Pair(parseBooks(doc), parseTotalPage(doc, page))
+        val books = parseBooks(doc)
+        // 还原书名里的原词，好通过 app 聚合搜索按原词过滤(见 ChineseConverter)
+        ChineseConverter.restoreKeywordInTitles(books, keywords)
+        return Pair(books, parseTotalPage(doc, page))
     }
 
     override fun getCategoryList(url: String): Category {

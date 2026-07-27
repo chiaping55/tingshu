@@ -97,7 +97,10 @@ object ITingShu : PtcmsTingShu() {
         } else {
             fetch(searchPageUrl(kw, page), "$baseUrl/")
         }
-        return Pair(parseBooks(doc), parseTotalPage(doc, page))
+        val books = parseBooks(doc)
+        // 把书名里的简体关键词还原成用户原词，好通过 app 的聚合搜索按原词过滤
+        ChineseConverter.restoreKeywordInTitles(books, keywords)
+        return Pair(books, parseTotalPage(doc, page))
     }
 
     /**

@@ -1,7 +1,10 @@
 import assertk.assertThat
 import assertk.assertions.isEqualTo
 import com.github.eprendre.sources_by_cp2.ChineseConverter
+import com.github.eprendre.tingshu.utils.Book
 import org.junit.Test
+
+private fun book(title: String) = Book("", "u", title, "a", "b")
 
 /**
  * 繁→简转换。实测确认过:繁体关键词在爱听书/起点/有听网都搜到 0 本，
@@ -36,5 +39,34 @@ class ChineseConverterTest {
         // 繁体字混英文/简体 —— 只动繁体那几个
         assertThat(ChineseConverter.toSimplified("聖墟 season2")).isEqualTo("圣墟 season2")
         assertThat(ChineseConverter.toSimplified("劍來广播剧")).isEqualTo("剑来广播剧")
+    }
+
+    // ---- restoreKeywordInTitles ----
+    // app 的聚合搜索按用户输入的原词过滤书名(实测:探针只保留书名含原词的书)。
+    // 繁体输入时我们转简体去抓，抓回的书名是简体、会被过滤光，所以要把书名里的简体词还原成原词。
+
+    @Test
+    fun restoresTraditionalKeywordIntoResultTitles() {
+        // 用户打繁体「劍來」，站方回的书名是简体「剑来…」—— 还原成「劍來…」才过得了 app 过滤
+        val books = listOf(book("剑来第八季广播剧"), book("剑来(下部)"))
+        ChineseConverter.restoreKeywordInTitles(books, "劍來")
+        assertThat(books[0].title).isEqualTo("劍來第八季广播剧")
+        assertThat(books[1].title).isEqualTo("劍來(下部)")
+    }
+
+    @Test
+    fun restoreIsNoOpForSimplifiedInput() {
+        // 用户本来就打简体 —— 书名一个字都不该动
+        val books = listOf(book("剑来第八季广播剧"))
+        ChineseConverter.restoreKeywordInTitles(books, "剑来")
+        assertThat(books[0].title).isEqualTo("剑来第八季广播剧")
+    }
+
+    @Test
+    fun restoreLeavesUnrelatedTitlesUntouched() {
+        // 书名不含关键词的(例如靠作者/别名命中的)不受影响
+        val books = listOf(book("某某传"))
+        ChineseConverter.restoreKeywordInTitles(books, "劍來")
+        assertThat(books[0].title).isEqualTo("某某传")
     }
 }

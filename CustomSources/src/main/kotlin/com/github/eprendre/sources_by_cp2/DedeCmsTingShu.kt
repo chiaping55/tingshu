@@ -95,7 +95,9 @@ abstract class DedeCmsTingShu : TingShu(), ISearchVerification {
             toast("站点要求先过一次安全验证，请在弹出的页面完成后重试")
             return Pair(emptyList(), 1)
         }
-        return Pair(parseBooks(doc), 1)// 搜索结果不分页
+        val books = parseBooks(doc)
+        ChineseConverter.restoreKeywordInTitles(books, keywords)
+        return Pair(books, 1)// 搜索结果不分页
     }
 
     // 转简体再搜:站方库是简体的，繁体会命中归零。放这里让 search 和验证页 callback 都受益

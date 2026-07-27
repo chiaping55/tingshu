@@ -59,7 +59,9 @@ object QiLinTingShu : PtcmsTingShu() {
         val url = "$baseUrl/so/search.html?searchtype=name" +
             "&searchword=${URLEncoder.encode(ChineseConverter.toSimplified(keywords), "UTF-8")}&page=$page"
         val doc = fetch(url, "$baseUrl/")
-        return Pair(parseBooks(doc), parseTotalPage(doc, page))
+        val books = parseBooks(doc)
+        ChineseConverter.restoreKeywordInTitles(books, keywords)
+        return Pair(books, parseTotalPage(doc, page))
     }
 
     override fun getCategoryMenus(): List<CategoryMenu> {

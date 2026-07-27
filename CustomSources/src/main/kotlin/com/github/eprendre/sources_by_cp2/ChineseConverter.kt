@@ -1,5 +1,7 @@
 package com.github.eprendre.sources_by_cp2
 
+import com.github.eprendre.tingshu.utils.Book
+
 /**
  * 繁体 → 简体 单字转换。
  *
@@ -11,6 +13,11 @@ package com.github.eprendre.sources_by_cp2
  * 没有简→繁那种一对多的歧义(简体「发」既可能是「發」也可能是「髮」)，
  * 所以逐字查表就够。表由 zhconv 遍历 CJK 基本区生成(共 3419 对，已滤掉非 BMP 字)。
  * 已经是简体、或含英文数字的关键词原样返回。
+ *
+ * **为什么还要 [restoreKeywordInTitles]：** app 的聚合搜索是客户端过滤的 ——
+ * 它拿用户输入的**原始关键词**去比对每本书的书名，不含原词的直接丢掉。所以繁体输入时，
+ * 我们转简体抓到的书(书名是简体)会被 app 过滤光。解法是把结果书名里的「简体关键词」
+ * 还原回用户输入的繁体原词，让它通过过滤 —— 实测确认过(探针:app 只保留书名含原词的书)。
  */
 internal object ChineseConverter {
     fun toSimplified(text: String): String {
@@ -21,6 +28,19 @@ internal object ChineseConverter {
             if (mapped != null) { out[i] = mapped; changed = true } else out[i] = text[i]
         }
         return if (changed) String(out) else text
+    }
+
+    /**
+     * 把结果书名里出现的「简体关键词」替换回用户输入的原词(通常是繁体)，
+     * 好让 app 按原词过滤书名时能保留这些书。用户本来就打简体时是无操作。
+     * 直接改 [Book.title]（可变）。
+     */
+    fun restoreKeywordInTitles(books: List<Book>, rawKeyword: String) {
+        val simplified = toSimplified(rawKeyword)
+        if (simplified == rawKeyword) return
+        for (b in books) {
+            if (b.title.contains(simplified)) b.title = b.title.replace(simplified, rawKeyword)
+        }
     }
 
     private val TABLE: Map<Char, Char> by lazy {

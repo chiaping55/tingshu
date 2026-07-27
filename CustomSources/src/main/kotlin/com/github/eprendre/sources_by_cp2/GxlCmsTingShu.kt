@@ -101,7 +101,9 @@ abstract class GxlCmsTingShu : TingShu(), AudioUrlExtraHeaders {
         } else {
             fetch(searchPageUrl(kw, page), "$baseUrl/")
         }
-        return Pair(parseBooks(doc), parseSearchTotalPage(doc, page))
+        val books = parseBooks(doc)
+        ChineseConverter.restoreKeywordInTitles(books, keywords)
+        return Pair(books, parseSearchTotalPage(doc, page))
     }
 
     /**
