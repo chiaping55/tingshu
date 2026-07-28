@@ -24,12 +24,29 @@ import java.net.URLEncoder
  * 3. 搜索被 B 站风控挡下(code != 0)时回空,而不是 NPE 崩掉。
  */
 object BiliBili : TingShu() {
-    private val headers = mapOf(
+    // B 站基础风控靠 buvid3/buvid4 cookie 识别,不带的话境外 IP 搜索会被 -412 拦截。
+    // 首次用到时向 finger/spi 取一次、之后复用。加短逾时,免得卡住整个聚合搜索。
+    private val cookie: String by lazy {
+        try {
+            val data = Fuel.get("https://api.bilibili.com/x/frontend/finger/spi")
+                .header("User-Agent", getMobileUA())
+                .timeout(6000).timeoutRead(6000)
+                .responseJson().third.get().obj().getJSONObject("data")
+            "buvid3=${data.optString("b_3")}; buvid4=${data.optString("b_4")}"
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
+    private fun headers() = mapOf(
         "User-Agent" to getMobileUA(),
-        "Referer" to "https://m.bilibili.com"
+        "Referer" to "https://m.bilibili.com",
+        "Cookie" to cookie
     )
 
-    override fun getSourceId() = "c893546d95f84db194046bd8de5dbcbb"
+    // 不沿用 eprendre 版的 sourceId:使用者若还订着那包,两个源同 id 会被 app 当成
+    // 同一个源去重,聚合搜索只采用其中一个(往往是旧的、被风控回空的那个)。
+    override fun getSourceId() = "a12b84c0b39a4c8fb0d90bb6a7bc2973"
 
     override fun getUrl() = "https://m.bilibili.com"
 
@@ -43,18 +60,24 @@ object BiliBili : TingShu() {
     override fun isWebViewNotRequired() = false
 
     override fun search(keywords: String, page: Int): Pair<List<Book>, Int> {
-        val kw = ChineseConverter.toSimplified(keywords)
-        val url = "https://api.bilibili.com/x/web-interface/search/all/v2" +
-            "?keyword=${URLEncoder.encode(kw, "utf-8")}&page=$page&pagesize=20"
-        val obj = Fuel.get(url).header(headers).responseJson().third.get().obj()
-        if (obj.optInt("code", -1) != 0 || obj.isNull("data")) {
-            // 被风控或无结果 —— 回空,别让整个聚合搜索因为这个源崩掉
-            return Pair(emptyList(), 1)
+        return try {
+            val kw = ChineseConverter.toSimplified(keywords)
+            val url = "https://api.bilibili.com/x/web-interface/search/all/v2" +
+                "?keyword=${URLEncoder.encode(kw, "utf-8")}&page=$page&pagesize=20"
+            val obj = Fuel.get(url).header(headers())
+                .timeout(8000).timeoutRead(8000)
+                .responseJson().third.get().obj()
+            if (obj.optInt("code", -1) != 0 || obj.isNull("data")) {
+                Pair(emptyList(), 1)
+            } else {
+                val data = obj.getJSONObject("data")
+                val books = parseVideoResults(data)
+                ChineseConverter.restoreKeywordInTitles(books, keywords)
+                Pair(books, data.optInt("numPages", 1))
+            }
+        } catch (e: Exception) {
+            Pair(emptyList(), 1)
         }
-        val data = obj.getJSONObject("data")
-        val books = parseVideoResults(data)
-        ChineseConverter.restoreKeywordInTitles(books, keywords)
-        return Pair(books, data.optInt("numPages", 1))
     }
 
     override fun getCategoryMenus(): List<CategoryMenu> {
@@ -78,7 +101,7 @@ object BiliBili : TingShu() {
         val currentPage = params[1].toInt()
         val currentUrl = "https://api.bilibili.com/x/web-interface/search/all/v2" +
             "?keyword=${URLEncoder.encode(keywords, "utf-8")}&page=$currentPage&pagesize=20"
-        val obj = Fuel.get(currentUrl).header(headers).responseJson().third.get().obj()
+        val obj = Fuel.get(currentUrl).header(headers()).responseJson().third.get().obj()
         if (obj.optInt("code", -1) != 0 || obj.isNull("data")) {
             return Category(emptyList(), currentPage, currentPage, url, "")
         }
@@ -119,7 +142,7 @@ object BiliBili : TingShu() {
         if (loadEpisodes) {
             val bvid = bookUrl.substringAfterLast("/video/").substringBefore("?").trim('/')
             val url = "https://api.bilibili.com/x/web-interface/view?bvid=$bvid"
-            val obj = Fuel.get(url).header(headers).responseJson().third.get().obj()
+            val obj = Fuel.get(url).header(headers()).responseJson().third.get().obj()
             if (obj.optInt("code", -1) == 0 && !obj.isNull("data")) {
                 val pages = obj.getJSONObject("data").getJSONArray("pages")
                 (0 until pages.length()).forEach {

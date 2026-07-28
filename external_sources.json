@@ -1,7 +1,7 @@
 {
-  "version": 22,
+  "version": 23,
   "entry_package": "sources_by_cp2",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp2.jar",
-  "update_msg": "新增「哔哩哔哩」源：B 站的多人有声剧、同人音声，片源和其它源都不同。可浏览、可播放(播放页要多等几秒经内置浏览器加载)。注意：聚合搜索里 B 站有时不出现(B 站接口对境外网络管得严)，想找 B 站的内容就点进这个源里浏览。",
+  "update_msg": "哔哩哔哩源加固：搜索带上 B 站的设备 cookie、加了超时保护，境外网络也能搜到结果。已知限制：这个源不参与聚合搜索，想找 B 站的有声剧请点进「哔哩哔哩」源里浏览或搜索。",
   "support_url": ""
 }
