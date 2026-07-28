@@ -35,7 +35,10 @@ object SourceEntry {
             LeTingBa,
             // 第三个模板家族(GXLCMS)。加它是为了补品类而不是凑数量:
             // 相声小品、曲艺戏曲这些上面几个源都没有，音频还是直链、不用 WebView。
-            Ting15
+            Ting15,
+            // B 站音频区:多人有声剧、同人音声,片源和上面几个网文站完全不同。
+            // 从原作者停维护的包移植+修好(旧 bvid 解析有 bug、API 也漂移过)。
+            BiliBili
         )
     }
 }

@@ -1,7 +1,7 @@
 {
-  "version": 21,
+  "version": 22,
   "entry_package": "sources_by_cp2",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp2.jar",
-  "update_msg": "繁体搜索现在真的能出结果了(聚合搜索也是)。之前只把查询转简体去抓还不够 —— app 会拿你输入的原词过滤书名，所以还得把结果书名里的关键词还原成你打的字，才不会被过滤掉。",
+  "update_msg": "新增「哔哩哔哩」源：B 站的多人有声剧、同人音声，片源和其它源都不同。可浏览、可播放(播放页要多等几秒经内置浏览器加载)。注意：聚合搜索里 B 站有时不出现(B 站接口对境外网络管得严)，想找 B 站的内容就点进这个源里浏览。",
   "support_url": ""
 }
