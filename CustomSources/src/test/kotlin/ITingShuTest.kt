@@ -30,7 +30,7 @@ class ITingShuTest {
          * （Kotlin object），共用一份才是忠实的测试条件，顺带也不去打扰站方。
          */
         private val source = object : PtcmsTingShu() {
-            override val baseUrl = "https://www.itingshu.net"
+            override val baseUrl = "http://www.itingshu.net"
 
             override val titleSuffix = "有声小说"
 
@@ -44,7 +44,7 @@ class ITingShuTest {
                     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
             /** 与 ITingShu 一致：章节目录走手机站，桌面站限流很紧 */
-            override val episodeDirectoryBaseUrl = "https://m.itingshu.net"
+            override val episodeDirectoryBaseUrl = "http://m.itingshu.net"
 
             override val episodeDirectoryUserAgent =
                 "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 " +
@@ -87,7 +87,7 @@ class ITingShuTest {
             }
         }
 
-        private const val SAMPLE_BOOK = "https://www.itingshu.net/youshengxiaoshuo/12508/"
+        private const val SAMPLE_BOOK = "http://www.itingshu.net/youshengxiaoshuo/12508/"
 
         /**
          * 页面抓一次、给所有断言共用。
@@ -167,11 +167,11 @@ class ITingShuTest {
      */
     @Test
     fun directoryUrlGoesToMobileHost() {
-        val desktop = "https://www.itingshu.net/itingshus/ugRmCc/cbbhASafUAuaRqAa.html"
+        val desktop = "http://www.itingshu.net/itingshus/ugRmCc/cbbhASafUAuaRqAa.html"
         val page3 = source.directoryPageUrl(desktop, 3)
         println("page3 = $page3")
         assertThat(page3).isEqualTo(
-            "https://m.itingshu.net/itingshus/ugRmCc/cbbhASafUAuaRqAa.html?page=3&sort=asc"
+            "http://m.itingshu.net/itingshus/ugRmCc/cbbhASafUAuaRqAa.html?page=3&sort=asc"
         )
     }
 
@@ -181,7 +181,7 @@ class ITingShuTest {
         val target = source.directoryPageUrl(dirUrl, 2)
         println("目录页地址 = $target")
         // 必须换到手机站，桌面站连翻会 429 并且波及其它书的浏览
-        assertThat(target.startsWith("https://m.itingshu.net/")).isTrue()
+        assertThat(target.startsWith("http://m.itingshu.net/")).isTrue()
 
         val secondPage = source.fetch(target, SAMPLE_BOOK, "Mozilla/5.0 (Linux; Android 13) " +
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36")
@@ -210,12 +210,12 @@ class ITingShuTest {
         val url = ITingShu.searchPageUrl("斗罗大陆", 2)
         println("第2页 = $url")
         assertThat(url).isEqualTo(
-            "https://www.itingshu.net/search/" +
+            "http://www.itingshu.net/search/" +
                 "oOoE6oOo96oOo97oOoE7oOoBDoOo97oOoE5oOoA4oOoA7oOoE9oOo99oOo86" +
                 "/lastupdate/2.html"
         )
         // 空格不能留成 +，站方认的是 oOo20
         assertThat(ITingShu.searchPageUrl("a b", 3))
-            .isEqualTo("https://www.itingshu.net/search/aoOo20b/lastupdate/3.html")
+            .isEqualTo("http://www.itingshu.net/search/aoOo20b/lastupdate/3.html")
     }
 }

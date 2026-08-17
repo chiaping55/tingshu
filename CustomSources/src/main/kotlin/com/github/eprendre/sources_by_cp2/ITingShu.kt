@@ -3,6 +3,7 @@ package com.github.eprendre.sources_by_cp2
 import com.github.eprendre.tingshu.sources.AudioUrlExtractor
 import com.github.eprendre.tingshu.sources.AudioUrlWebViewSniffExtractor
 import com.github.eprendre.tingshu.utils.Book
+import com.github.eprendre.tingshu.utils.BookDetail
 import com.github.eprendre.tingshu.utils.CategoryMenu
 import com.github.eprendre.tingshu.utils.CategoryTab
 import java.net.URLEncoder
@@ -27,7 +28,13 @@ import java.net.URLEncoder
  * 打开只会显示「载入出错了」；而这个站是实测里唯一大量收录近年多人有声剧的可爬站点。
  */
 object ITingShu : PtcmsTingShu() {
-    override val baseUrl = "https://www.itingshu.net"
+    /**
+     * 走 http 不走 https:站方的 Let's Encrypt 凭证 2026-08-05 到期后没有续
+     * (自动续期坏了),https 在 app 和测试里都会被凭证校验挡下。站方仍开着
+     * 纯 http(200、不强制跳转),内容一样,所以整个源改走 http 绕开。
+     * 若站方哪天续了凭证并把 http 转向 https,Jsoup 会跟着跳转,不用改回来。
+     */
+    override val baseUrl = "http://www.itingshu.net"
 
     override val titleSuffix = "有声小说"
 
@@ -61,7 +68,7 @@ object ITingShu : PtcmsTingShu() {
      * 一千多集的书目录有 27 页，连着翻桌面站就会 429，而且额度用光后连别的书的
      * 列表都读不出来。实测手机站额度独立：同样连翻 8 页完全正常。
      */
-    override val episodeDirectoryBaseUrl = "https://m.itingshu.net"
+    override val episodeDirectoryBaseUrl = "http://m.itingshu.net"
 
     override val episodeDirectoryUserAgent =
         "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 " +
@@ -69,6 +76,10 @@ object ITingShu : PtcmsTingShu() {
 
     /** 章节目录连着翻还是客气一点 */
     override val episodePageDelay = 400L..900L
+
+    /** 书架里旧收藏存的还是 https 地址 —— 进来先降成 http,不然照样撞过期凭证 */
+    override fun getBookDetailInfo(bookUrl: String, loadEpisodes: Boolean, loadFullPages: Boolean): BookDetail =
+        super.getBookDetailInfo(bookUrl.replaceFirst("https://", "http://"), loadEpisodes, loadFullPages)
 
     override fun getAudioUrlExtractor(): AudioUrlExtractor {
         // 不加过滤条件，站点播放器请求什么就嗅什么；传 null 是为了清掉别的源可能留下的过滤器

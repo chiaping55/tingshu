@@ -1,7 +1,7 @@
 {
-  "version": 23,
+  "version": 24,
   "entry_package": "sources_by_cp2",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp2.jar",
-  "update_msg": "哔哩哔哩源加固：搜索带上 B 站的设备 cookie、加了超时保护，境外网络也能搜到结果。已知限制：这个源不参与聚合搜索，想找 B 站的有声剧请点进「哔哩哔哩」源里浏览或搜索。",
+  "update_msg": "修复爱听书：站方的安全证书 8 月 5 日过期后一直没续，导致这个源打不开。已改走 http 绕开，恢复正常。书架里的爱听书旧收藏如果还是打不开，刷新一下章节列表或重新搜索添加即可。",
   "support_url": ""
 }
