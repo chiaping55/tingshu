@@ -42,10 +42,21 @@ class DedeCmsSourcesTest {
         )
         // 不带 Referer —— 实测 fdfs.xmcdn.com 一带就回 403，aod 带不带都一样，
         // 所以基类已经不再加这个头。测试要和 app 实际发出的请求一致。
-        connection.connectTimeout = 20000
-        connection.readTimeout = 20000
+        // 35s:CI 在美国机房,到喜马 CDN 的往返慢,20s 会把"慢"误报成"坏"
+        connection.connectTimeout = 35000
+        connection.readTimeout = 35000
         val code = connection.responseCode
-        val bytes = connection.inputStream.use { it.readBytes().size }
+        // 读取封顶 16KB:有的 CDN 忽略 Range,readBytes() 会把整集拉完,跨洋必超时
+        val bytes = connection.inputStream.use { ins ->
+            val buf = ByteArray(16 * 1024)
+            var total = 0
+            while (total < buf.size) {
+                val n = ins.read(buf, total, buf.size - total)
+                if (n < 0) break
+                total += n
+            }
+            total
+        }
         println("    播放测试: HTTP $code ${connection.contentType} ${bytes}B")
         // 必须断言 Content-Type —— 站点故障时会回 200 的 HTML 错误页，
         // 只看状态码和字节数的话那也算"能播"，等于测不出坏掉的地址
