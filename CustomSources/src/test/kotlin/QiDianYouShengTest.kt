@@ -18,6 +18,9 @@ class QiDianYouShengTest {
 
     private val source = object : PtcmsTingShu() {
         override val baseUrl = "https://www.qdysw.com"
+
+        /** 必须和 QiDianYouSheng 保持一致 —— 这份复本每个 override 都是会漂移的地方 */
+        override val audioPrefersSignedUrl = true
         override fun getSourceId() = "3c0449a8f40b47a4b6f8b53fa2c9c6a5"
         override fun getName() = "起点有声网"
         override fun getCategoryMenus(): List<CategoryMenu> = listOf(

@@ -1,7 +1,7 @@
 {
-  "version": 25,
+  "version": 26,
   "entry_package": "sources_by_cp2",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp2.jar",
-  "update_msg": "下架麒麟听书：站点已于 10 月整个消失（所有页面 404，不是临时故障），这个源打开只会报错，已移除。书架里麒麟听书的旧收藏可换别的源重新搜索添加。",
+  "update_msg": "修复起点有声网：站方音频服务器改成签名制后，很多章节拿到的是未签名地址，表现为能看到章节却播不出来。现在会自动换线路取带签名的地址，恢复正常。书架里起点有声网的旧收藏不用重新添加。",
   "support_url": ""
 }

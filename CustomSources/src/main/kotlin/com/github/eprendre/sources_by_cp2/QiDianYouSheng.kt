@@ -5,18 +5,26 @@ import com.github.eprendre.tingshu.utils.CategoryMenu
 /**
  * 起点有声网 https://www.qdysw.com
  *
- * PTCMS 模板站，纯 Jsoup 即可，音频是 kuwo cdn 上的 mp3 直链且没有防盗链。
+ * PTCMS 模板站，纯 Jsoup 即可，音频是直链、不用 WebView。
+ *
+ * 2026-10 起音频主机(mp3i.ting13.top)改成签名制：只认 `…m4a?sign=…&soug=…` 的地址，
+ * 没签名的 `….mp3` 一律 404；而各线路给不给签名不固定、同一线路前后两次也可能不同，
+ * 所以开 [audioPrefersSignedUrl]：拿到没签名的继续换线路找带签名的(探针实测每集
+ * 十几条线路里总有几条给签名)。
  * 同模板的还有 乐听网(m.leting.vip)、奇听网(m.qiting.cc)、一夜幻听网(ting39.com)，
  * 要加的时候继承 [PtcmsTingShu] 换 baseUrl 就行。
  */
 object QiDianYouSheng : PtcmsTingShu() {
     override val baseUrl = "https://www.qdysw.com"
 
+    /** cdn 签名制，见类注释 */
+    override val audioPrefersSignedUrl = true
+
     override fun getSourceId() = "3c0449a8f40b47a4b6f8b53fa2c9c6a5"
 
     override fun getName() = "起点有声网"
 
-    override fun getDesc() = "推荐指数:5星 ⭐⭐⭐⭐⭐\n资源约1.5万本，mp3直链无防盗链，手表也能用。"
+    override fun getDesc() = "推荐指数:5星 ⭐⭐⭐⭐⭐\n资源约1.5万本，音频直链不用内置浏览器，手表也能用。"
 
     override fun getCategoryMenus(): List<CategoryMenu> {
         return listOf(

@@ -223,6 +223,20 @@ abstract class PtcmsTingShu : TingShu() {
      */
     protected open val audioRequiresSignedUrl: Boolean = false
 
+    /**
+     * 这个站的 cdn **开始**校验签名，但各条线路给的地址有的带签名、有的不带，
+     * 而且同一条线路前后两次也不一定一样。
+     *
+     * 起点有声网 2026-10 就变成这样：音频主机 mp3i.ting13.top 只认
+     * `….m4a?sign=…&soug=…`，没签名的 `….mp3` 一律 404(换 UA、加 Referer 都没用)。
+     * 探针实测每集十几条线路里总有几条给签名地址，所以这里不像
+     * [audioRequiresSignedUrl] 那样拿到没签名的就回空，而是**继续换线路找带签名的**，
+     * 全部翻完都没有才退回没签名那条(见 [chooseAudioUrl])。
+     *
+     * 代价是这种集要多打几个 player 请求；不开的站行为完全不变(非空即收)。
+     */
+    protected open val audioPrefersSignedUrl: Boolean = false
+
     override fun search(keywords: String, page: Int): Pair<List<Book>, Int> {
         // 站方数据库是简体的，繁体输入会字面对不上、命中率归零 —— 先转简体再搜
         val url = "$baseUrl/search.html?searchtype=name" +
@@ -351,11 +365,13 @@ abstract class PtcmsTingShu : TingShu() {
             toast("找不到播放器，站点可能改版了")
             return ""
         }
-        audioUrl(fetchHtml(playerUrl, chapterUrl)).let { if (it.isNotEmpty()) return it }
-        for (site in audioFallbackSites) {
-            val url = audioUrl(fetchHtml(withSite(playerUrl, site), chapterUrl))
-            if (url.isNotEmpty()) return url
-        }
+        // 每条线路包成 lambda，挑选时才真的去请求：取到能用的就停，不会把线路全打一遍
+        val lines: List<() -> String> =
+            listOf<() -> String>({ audioUrl(fetchHtml(playerUrl, chapterUrl)) }) +
+                audioFallbackSites.map { site ->
+                    { audioUrl(fetchHtml(withSite(playerUrl, site), chapterUrl)) }
+                }
+        chooseAudioUrl(lines).let { if (it.isNotEmpty()) return it }
         // 有的站换线路这条路走不通(播放器地址里的 token 一次性，重打只会被拒)，
         // 那就重新取章节页换张新票再试。
         //
@@ -373,6 +389,30 @@ abstract class PtcmsTingShu : TingShu() {
         toast(noAudioMessage)
         return ""
     }
+
+    /**
+     * 从各线路依次取到的候选地址里挑一个。
+     *
+     * 默认**非空即收**，拿到第一个地址就不再往下打请求。
+     * 开了 [audioPrefersSignedUrl] 时，没签名的地址先记着、继续换线路找带签名的，
+     * 所有线路都翻过还是没有才退回第一个没签名的 —— 对签名 cdn 来说那也只是
+     * 死马当活马医，但总比直接回空、把一集判成没音频要好。
+     *
+     * 候选是 lambda，每调一个就是一次网络请求，所以找到就立刻停(有测试钉住次数)。
+     */
+    internal fun chooseAudioUrl(candidates: List<() -> String>): String {
+        var firstUnsigned = ""
+        for (fetchLine in candidates) {
+            val candidate = fetchLine()
+            if (candidate.isEmpty()) continue
+            if (!audioPrefersSignedUrl || isSignedAudioUrl(candidate)) return candidate
+            if (firstUnsigned.isEmpty()) firstUnsigned = candidate
+        }
+        return firstUnsigned
+    }
+
+    /** 签名与否只看有没有查询参数，和 [audioRequiresSignedUrl] 用同一把尺 */
+    private fun isSignedAudioUrl(url: String) = url.contains('?')
 
     private fun withSite(playerUrl: String, site: Int): String {
         val pattern = Regex("""([?&]site=)\d*""")
@@ -422,7 +462,7 @@ abstract class PtcmsTingShu : TingShu() {
                 else -> withMurlSuffix(url, playerHtml)
             }
             // 签名 cdn 上的音频，没有签名参数就是个注定 403 的地址 —— 见 audioRequiresSignedUrl
-            if (audioRequiresSignedUrl && !candidate.contains('?')) return ""
+            if (audioRequiresSignedUrl && !isSignedAudioUrl(candidate)) return ""
             return candidate
         }
         // url 变量是空的 —— 起点有声网的**默认线路**就是这样：地址直接写死在
