@@ -1,7 +1,7 @@
 {
-  "version": 26,
+  "version": 27,
   "entry_package": "sources_by_cp2",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp2.jar",
-  "update_msg": "修复起点有声网：站方音频服务器改成签名制后，很多章节拿到的是未签名地址，表现为能看到章节却播不出来。现在会自动换线路取带签名的地址，恢复正常。书架里起点有声网的旧收藏不用重新添加。",
+  "update_msg": "新增两个书源：博看有声（期刊社的有声库：名著解读、商业财经、心理、育儿、历史、儿童文学，和网文有声完全不重叠）和 LibriVox（公版英文有声书，用英文按书名开头或作者搜索；音频在 archive.org，境内可能连不上）。两个都是音频直链，手表也能用。新源默认关闭，请到 设置 → 选择源站点 勾选。",
   "support_url": ""
 }

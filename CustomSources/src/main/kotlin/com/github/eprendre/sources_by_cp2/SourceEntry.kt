@@ -38,7 +38,12 @@ object SourceEntry {
             Ting15,
             // B 站音频区:多人有声剧、同人音声,片源和上面几个网文站完全不同。
             // 从原作者停维护的包移植+修好(旧 bvid 解析有 bug、API 也漂移过)。
-            BiliBili
+            BiliBili,
+            // 2026-10 补两类上面都没有的内容(都从原作者的包移植、接口重新验过):
+            // 博看有声 = 期刊社的有声库(名著解读、商业、心理、育儿、儿童文学);
+            // LibriVox = 公版英文有声书。两个都是直链、不用 WebView。
+            BoKanYouSheng,
+            LibriVox
         )
     }
 }
