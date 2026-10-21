@@ -1,7 +1,7 @@
 {
-  "version": 24,
+  "version": 25,
   "entry_package": "sources_by_cp2",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp2.jar",
-  "update_msg": "修复爱听书：站方的安全证书 8 月 5 日过期后一直没续，导致这个源打不开。已改走 http 绕开，恢复正常。书架里的爱听书旧收藏如果还是打不开，刷新一下章节列表或重新搜索添加即可。",
+  "update_msg": "下架麒麟听书：站点已于 10 月整个消失（所有页面 404，不是临时故障），这个源打开只会报错，已移除。书架里麒麟听书的旧收藏可换别的源重新搜索添加。",
   "support_url": ""
 }

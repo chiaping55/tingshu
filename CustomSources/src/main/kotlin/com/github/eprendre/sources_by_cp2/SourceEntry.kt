@@ -29,8 +29,8 @@ object SourceEntry {
             ITingShu,
             QiDianYouSheng,
             HuanTingWang39,
-            // 麒麟听书:书多、更新勤，音频在蜻蜓FM，和上面几个源的片源不同
-            QiLinTingShu,
+            // 麒麟听书(70ts.com)已移除:2026-10-20 确认站点被清空(所有页面 404，
+            // 只剩主机面板默认页)，两个出口复验一致。类和测试一并删了，git 历史里有。
             TingShuBa,
             LeTingBa,
             // 第三个模板家族(GXLCMS)。加它是为了补品类而不是凑数量:

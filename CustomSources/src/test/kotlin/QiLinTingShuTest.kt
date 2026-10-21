@@ -1,7 +1,5 @@
 import assertk.assertThat
 import assertk.assertions.isEqualTo
-import assertk.assertions.isGreaterThan
-import assertk.assertions.isNotEmpty
 import assertk.assertions.isTrue
 import com.github.eprendre.sources_by_cp2.PtcmsTingShu
 import com.github.eprendre.tingshu.utils.Book
@@ -12,10 +10,12 @@ import org.junit.Test
 import java.net.URLEncoder
 
 /**
- * 麒麟听书(70ts.com)测试。
+ * 麒麟听书(70ts.com)的**离线**测试。
  *
- * 这个站对**取音频地址**有风控：连着要几次就暂时不给(player 页里的 url 变量是空的)。
- * 所以整个套件只在最后取一次地址，前面的解析断言都共用同一批页面。
+ * 站点 2026-10-20 确认死亡(整站 404，只剩主机面板默认页)，源已从 SourceEntry 移除、
+ * QiLinTingShu.kt 也删了。但它逼出来的几个基类开关(书页即章节第 1 页、签名 cdn 没签名
+ * 就不交地址、setMedia 后缀优先于 murl)还在 PtcmsTingShu 里，这里留的纯字符串测试
+ * 继续钉住这些行为。网络测试(分类、书页、真下载)已随站一起删除。
  */
 class QiLinTingShuTest {
 
@@ -29,13 +29,7 @@ class QiLinTingShuTest {
 
             override val audioFallbackSites = emptyList<Int>()
 
-            /**
-             * 必须和 QiLinTingShu 保持一致。
-             *
-             * 这份匿名复本每加一个 override 就多一处会漂移的地方 —— 这一轮已经踩过两次:
-             * 先是 ITingShuTest 漏了 userAgent(害我把选择器 bug 误判成站点限流)，
-             * 接着是这里漏了 audioRequiresPlayerSuffix。加 override 时记得两边都改。
-             */
+            /** 保留当年 QiLinTingShu 的全部开关，测的是基类对这组开关的行为 */
             override val audioRequiresSignedUrl = true
 
             override fun getSourceId() = "e4a7d95c1b8f43629d0e5a76c2b18f3d"
@@ -66,45 +60,8 @@ class QiLinTingShuTest {
             }
         }
 
-        /** 《无上神帝》6000 多集、200 多页，分页逻辑撑得起来 */
+        /** 只用来验翻页地址的字符串拼接，不会真的去抓 */
         private const val SAMPLE_BOOK = "https://www.70ts.com/tingshu/12394/"
-
-        private val category by lazy {
-            source.getCategoryList(source.getCategoryMenus().first().tabs.first().url)
-        }
-
-        /** loadFullPages=false：只要第 1 页，别把 200 多页全抓一遍去打扰站方 */
-        private val detail by lazy {
-            source.getBookDetailInfo(SAMPLE_BOOK, loadEpisodes = true, loadFullPages = false)
-        }
-    }
-
-    @Test
-    fun categoryList() {
-        category.list.take(3).forEach { println("  $it") }
-        println("page ${category.currentPage}/${category.totalPage} next=${category.nextUrl}")
-        assertThat(category.list.size).isGreaterThan(5)
-        assertThat(category.totalPage).isGreaterThan(5)
-        assertThat(category.nextUrl).isNotEmpty()
-        assertThat(category.list.first().coverUrl).isNotEmpty()
-        assertThat(category.list.first().title).isNotEmpty()
-    }
-
-    /**
-     * 这个站没有 a.dirurl —— 书页本身就是章节第 1 页，而且是**正序**。
-     * 要是走了起点系那条路(找 dirurl 找不到就把详情页倒序当结果)，
-     * 这里会拿到倒过来的章节，播放列表整个反了。
-     */
-    @Test
-    fun bookPageIsFirstEpisodePage() {
-        println("演播=${detail.artist} 章节=${detail.playList.size}")
-        detail.playList.take(3).forEach { println("  $it") }
-        assertThat(detail.coverUrl).isNotEmpty()
-        assertThat(detail.artist).isNotEmpty()
-        // 书页一页 30 集
-        assertThat(detail.playList.size).isGreaterThan(20)
-        // 必须是正序：第 1 集在最前面
-        assertThat(detail.playList.first().title.contains("0001")).isTrue()
     }
 
     /**
@@ -194,39 +151,5 @@ class QiLinTingShuTest {
     fun audioUrlEmptyWhenSiteWithholdsIt() {
         val html = "murl6280764085 = '.mp3';\nurl6280764085 = '';"
         assertThat(source.audioUrl(html)).isEqualTo("")
-    }
-
-    /**
-     * 走一遍真正的取址流程并**下载一段音频**。
-     *
-     * 只有这一个测试会碰取址接口 —— 这个站对取址有风控，连着要几次就暂时不给，
-     * 所以整个套件就要一次。要是这里因为风控失败，讯息会写清楚是"站点没给地址"
-     * 而不是"解析错了"，免得下次看到红字又往错的方向查(这个坑这轮踩过两次)。
-     */
-    @Test
-    fun resolvesAndDownloadsRealAudio() {
-        val chapterUrl = detail.playList.first().url
-        println("章节页 = $chapterUrl")
-        val audioUrl = source.resolveAudioUrl(chapterUrl)
-        println("音频地址 = $audioUrl")
-        if (audioUrl.isEmpty()) {
-            println("⚠ 站点这次没给地址(取址风控)。解析逻辑由上面几个纯字符串测试保证；")
-            println("  过一会再跑这条，或在真机上直接播一集验证。")
-            return
-        }
-        // 拿到地址就一定要真的读到字节 —— 这个站的 auth_key 漏了会回 403，
-        // 只断言"非空"的话完全看不出来
-        assertThat(audioUrl.contains("auth_key")).isTrue()
-        val connection = java.net.URL(audioUrl).openConnection() as java.net.HttpURLConnection
-        connection.setRequestProperty("Referer", "https://www.70ts.com/")
-        connection.setRequestProperty("Range", "bytes=0-4096")
-        connection.connectTimeout = 20000
-        connection.readTimeout = 20000
-        val code = connection.responseCode
-        val bytes = connection.inputStream.use { it.readBytes().size }
-        println("  ▶ 播放测试: HTTP $code ${connection.contentType} ${bytes}B")
-        connection.disconnect()
-        assertThat(code in 200..299).isTrue()
-        assertThat(bytes > 0).isTrue()
     }
 }
