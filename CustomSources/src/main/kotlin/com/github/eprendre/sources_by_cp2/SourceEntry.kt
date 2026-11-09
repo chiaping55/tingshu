@@ -43,7 +43,10 @@ object SourceEntry {
             // 博看有声 = 期刊社的有声库(名著解读、商业、心理、育儿、儿童文学);
             // LibriVox = 公版英文有声书。两个都是直链、不用 WebView。
             BoKanYouSheng,
-            LibriVox
+            LibriVox,
+            // 听友听书(2026-11):多人有声剧、名家演播版本(喜马拉雅上那批热门版本)、评书按演播人分类,
+            // 纯 JSON 接口、音频直链。
+            TingYouFm
         )
     }
 }

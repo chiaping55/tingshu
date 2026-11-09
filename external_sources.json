@@ -1,7 +1,7 @@
 {
-  "version": 28,
+  "version": 29,
   "entry_package": "sources_by_cp2",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp2.jar",
-  "update_msg": "下架有听网：站点 11 月 2 日起整站断线（连接建立后服务器立刻断开），观察一周没有恢复，这个源打开只会报错，已移除。其余书源不受影响。书架里有听网的旧收藏可换别的源重新搜索添加。",
+  "update_msg": "新增听友听书：多人有声剧、名家演播版本多（《剑来》大斌、头陀渊、老宝玉等），评书按演播人分类（单田芳、刘兰芳、田连元…）。音频直链，手表也能用。新源默认关闭，请到 设置 → 选择源站点 勾选。",
   "support_url": ""
 }
