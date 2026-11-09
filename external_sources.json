@@ -1,7 +1,7 @@
 {
-  "version": 27,
+  "version": 28,
   "entry_package": "sources_by_cp2",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp2.jar",
-  "update_msg": "新增两个书源：博看有声（期刊社的有声库：名著解读、商业财经、心理、育儿、历史、儿童文学，和网文有声完全不重叠）和 LibriVox（公版英文有声书，用英文按书名开头或作者搜索；音频在 archive.org，境内可能连不上）。两个都是音频直链，手表也能用。新源默认关闭，请到 设置 → 选择源站点 勾选。",
+  "update_msg": "下架有听网：站点 11 月 2 日起整站断线（连接建立后服务器立刻断开），观察一周没有恢复，这个源打开只会报错，已移除。其余书源不受影响。书架里有听网的旧收藏可换别的源重新搜索添加。",
   "support_url": ""
 }

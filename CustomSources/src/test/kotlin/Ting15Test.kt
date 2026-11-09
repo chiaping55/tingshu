@@ -1,18 +1,18 @@
 import assertk.assertThat
 import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
-import assertk.assertions.isGreaterThan
-import assertk.assertions.isNotEmpty
 import assertk.assertions.isTrue
 import com.github.eprendre.sources_by_cp2.GxlCmsTingShu
 import org.jsoup.Connection
 import org.junit.Test
 
 /**
- * ting15(GXLCMS 模板)测试。
+ * GXLCMS 模板基类的**离线**测试(样本来自有听网 ting15.com)。
  *
- * 这个站限流很严 —— 触发后锁一小时，所以整个套件只发一个用户听一集的请求量：
- * 页面共用(companion + by lazy)，取址只测一集。
+ * 有听网 2026-11-02 起整站断线、一周未恢复，源已下架、Ting15.kt 删了；
+ * 但它逼出来的基类行为(JSON unicode 转义还原、中文路径百分号编码、防盗链 Referer、
+ * 取址接口 status 语义、搜索分页的链接形状)还在 GxlCmsTingShu 里，这些纯逻辑测试继续钉住。
+ * 网络测试(分类、详情、真下载)已随站一起删除。
  */
 class Ting15Test {
 
@@ -34,80 +34,6 @@ class Ting15Test {
                 println("toast: $message")
             }
         }
-
-        /**
-         * 《无敌剑域》—— 3977 集、分类有十几页，章节和分页的断言都撑得起来，
-         * 而且它的音频在 oss-links 上、境外可以直连。
-         *
-         * 特意**不用**经典评书那一类当样本：那一整类的音频都在 cloud.guoguo.org.cn，
-         * 境外 TCP 443 直接超时(抽了 3 本都一样)，拿它当样本会让测试在境外永远红，
-         * 而问题根本不在代码里。相声小品那类音频在微信 CDN、境外实测能播，
-         * 但只有 5 本 1 页、集数也少，撑不起分页和章节的断言。
-         */
-        private const val SAMPLE_BOOK = "https://www.ting15.com/wuxiaxuanhuan/2117.html"
-
-        private val category by lazy {
-            source.getCategoryList(source.getCategoryMenus().first().tabs.first().url)
-        }
-
-        private val detail by lazy {
-            source.getBookDetailInfo(SAMPLE_BOOK, loadEpisodes = true, loadFullPages = true)
-        }
-    }
-
-    @Test
-    fun categoryList() {
-        category.list.take(3).forEach { println("  $it") }
-        println("page ${category.currentPage}/${category.totalPage} next=${category.nextUrl}")
-        assertThat(category.list.size).isGreaterThan(5)
-        // 分页栏带"尾页"，能拿到真实总页数
-        assertThat(category.totalPage).isGreaterThan(5)
-        assertThat(category.nextUrl).isNotEmpty()
-        assertThat(category.list.first().coverUrl).isNotEmpty()
-        // 列表页就给了作者和播音，不必进详情页
-        assertThat(category.list.first().author).isNotEmpty()
-    }
-
-    @Test
-    fun bookDetail() {
-        println("作者=${detail.author} 演播=${detail.artist} 章节=${detail.playList.size}")
-        println("简介=${detail.intro?.take(60)}")
-        detail.playList.take(3).forEach { println("  $it") }
-        assertThat(detail.author).isNotEmpty()
-        assertThat(detail.artist).isNotEmpty()
-        assertThat(detail.coverUrl).isNotEmpty()
-        assertThat(detail.intro.isNullOrEmpty()).isFalse()
-        // 章节全在详情页一次拿到，不分页
-        assertThat(detail.playList.size).isGreaterThan(100)
-        assertThat(detail.playList.first().title).isNotEmpty()
-    }
-
-    /**
-     * 取址 + **真的下载一段音频**。
-     *
-     * 只断言"拿到地址了"是不够的 —— 起点有声网那次就是地址拿到了却播不出来
-     * (线路返回空、地址缺后缀)，所以这里一定要真的读到字节。
-     */
-    @Test
-    fun audioUrlIsPlayable() {
-        val chapterUrl = detail.playList.first().url
-        println("章节页 = $chapterUrl")
-        val audioUrl = source.resolveAudioUrl(chapterUrl)
-        println("音频地址 = $audioUrl")
-        assertThat(audioUrl).isNotEmpty()
-
-        val connection = java.net.URL(audioUrl).openConnection() as java.net.HttpURLConnection
-        // 这个 cdn 校验防盗链，不带 Referer 直接 400 —— headers() 就是为它准备的
-        source.headers(audioUrl).forEach { (k, v) -> connection.setRequestProperty(k, v) }
-        connection.setRequestProperty("Range", "bytes=0-4096")
-        connection.connectTimeout = 20000
-        connection.readTimeout = 20000
-        val code = connection.responseCode
-        val bytes = connection.inputStream.use { it.readBytes().size }
-        println("  播放测试: HTTP $code ${connection.contentType} ${bytes}B")
-        connection.disconnect()
-        assertThat(code in 200..299).isTrue()
-        assertThat(bytes > 0).isTrue()
     }
 
     /**
