@@ -1,7 +1,7 @@
 {
-  "version": 29,
+  "version": 30,
   "entry_package": "sources_by_cp2",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp2.jar",
-  "update_msg": "新增听友听书：多人有声剧、名家演播版本多（《剑来》大斌、头陀渊、老宝玉等），评书按演播人分类（单田芳、刘兰芳、田连元…）。音频直链，手表也能用。新源默认关闭，请到 设置 → 选择源站点 勾选。",
+  "update_msg": "修复爱听书：站方 11 月起在所有页面前面加了一道验证（首次访问先发 cookie 再跳转），导致分类、搜索、章节全部打不开。现在会自动过这道验证，恢复正常，书架里的收藏不用重新添加。",
   "support_url": ""
 }

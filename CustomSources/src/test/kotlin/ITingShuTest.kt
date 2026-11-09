@@ -110,6 +110,8 @@ class ITingShuTest {
 
     /**
      * 反爬挑战：cookie 名称是 `__51guid__`，写死 `pt_guid` 的话这里只会拿到挑战页。
+     * 2026-11 起前面还多一道「403 + Set-Cookie + reload」的闸门,不带 cookie 重打就永远 403 ——
+     * 能拿到 book-info 就证明两道都过了。
      */
     @Test
     fun passesGuardChallenge() {

@@ -16,24 +16,32 @@ import java.net.URLEncoder
  * 而是把脚本里的变量声明和 cookie 赋值都解出来自己对应 —— 同一份逻辑就能吃两种站，
  * 站方哪天改名也不用改代码。
  *
+ * 2026-11 起爱听书在这之前又加了一道「cookie 闸门」(403 + Set-Cookie + js reload),见 [isCookieGate]。
+ *
  * 挑战页有时还会用 Set-Cookie 下发一个 id（起点系是 `pt_browser_id`），token 是用它算出来的，
  * 所以两边的 cookie 都要带上。**但各站不一样**：爱听书 2026-07 复验时只下发一个
  * `server_name_session`（后端节点值），完全不带它、只带解出来的 token 照样拿到完整页面。
  * 代码一律合并 response cookie，两种站都吃得下，不必分开处理。
  */
 internal class PtcmsGuard {
-    private val cookies = HashMap<String, String>()
+    /**
+     * cookie 按主机分开存。
+     *
+     * 爱听书的目录页走 m. 站、其余走 www,两边各发各的闸门 cookie(见 [isCookieGate]),
+     * 名字一样、值不同 —— 混在一个 map 里会互相覆盖,每换一次主机就重新过一次闸门。
+     */
+    private val jars = HashMap<String, HashMap<String, String>>()
+
+    private fun jarFor(host: String) = jars.getOrPut(host) { HashMap() }
 
     /**
      * @param build 每次调用都要产生一个新的 Connection（同一个不能重送）
      */
     fun request(build: () -> Connection): Connection.Response {
         var response = execute(build)
-        cookies.putAll(response.cookies())
         val solved = solve(response.body()) ?: return response
-        cookies.putAll(solved)
+        jarFor(response.url().host).putAll(solved)
         response = execute(build)
-        cookies.putAll(response.cookies())
         // 带上 cookie 重送之后**还是**挑战页 —— 表示这套解法对不上了(站方改了挑战写法)。
         // 一定要抛：挑战页只有一千多字节、没有任何书籍内容，交回去解析的结果是
         // 「这本书 0 集」「搜索没结果」，使用者只会以为源坏了、维护者也查不到方向。
@@ -63,23 +71,52 @@ internal class PtcmsGuard {
      */
     private fun execute(build: () -> Connection): Connection.Response {
         var wait = FIRST_BACKOFF_MS
-        repeat(MAX_RETRY) { attempt ->
-            val response = build().cookies(cookies).ignoreHttpErrors(true).execute()
+        var throttled = 0
+        var gated = 0
+        while (true) {
+            val connection = build()
+            val jar = jarFor(connection.request().url().host)
+            val response = connection.cookies(jar).ignoreHttpErrors(true).execute()
+            // 不管成败都先收下 cookie:闸门页就是靠 Set-Cookie 发放通行证的
+            jar.putAll(response.cookies())
             val status = response.statusCode()
             if (status in 200..299) {
                 return response
             }
-            if (status != TOO_MANY_REQUESTS) {
-                // 不是限流就没必要退避重试(404 再等也是 404)，直接抛出去
-                throw IOException("站点返回 HTTP $status，这不是限流，可能改版或临时故障")
-            }
-            // 最后一次尝试之后不必再等 —— 等完还是要抛，那 12 秒纯粹是让用户多看 12 秒转圈
-            if (attempt < MAX_RETRY - 1) {
+            if (status == TOO_MANY_REQUESTS) {
+                throttled++
+                if (throttled >= MAX_RETRY) {
+                    throw IOException("站点限流(429)，退避重试 $MAX_RETRY 次仍被拒绝，请过一会再试")
+                }
                 Thread.sleep(wait)
                 wait *= 2
+                continue
             }
+            if (isCookieGate(status, response) && gated < MAX_GATE_RETRY) {
+                // 刚拿到通行证,立刻带上重打同一地址,不用等
+                gated++
+                continue
+            }
+            // 不是限流也不是闸门就没必要重试(404 再等也是 404)，直接抛出去
+            throw IOException("站点返回 HTTP $status，这不是限流，可能改版或临时故障")
         }
-        throw IOException("站点限流(429)，退避重试 $MAX_RETRY 次仍被拒绝，请过一会再试")
+    }
+
+    /**
+     * 「cookie 闸门」:爱听书 2026-11 起的新门槛。
+     *
+     * 没带 cookie 的首次请求一律回 **403**,但响应里 Set-Cookie 发了两个会话 cookie,
+     * 正文只有一百多字节:`window.location.href = "<同一个地址>"` —— 浏览器带着 cookie
+     * 重新载入就过了。它和 `var reversed` 那种要解脚本的挑战不同,什么都不用算,
+     * 带上 cookie 重打一次即可;www 与 m. 两个主机各发各的。
+     *
+     * 判断条件三个都要满足,免得把真正的 403(封 IP、路径不存在)也拿去重打:
+     * 状态 403、有 Set-Cookie、正文很短且含 location.href。
+     */
+    private fun isCookieGate(status: Int, response: Connection.Response): Boolean {
+        if (status != FORBIDDEN || response.cookies().isEmpty()) return false
+        val body = response.body()
+        return body.length <= GATE_MAX_CHARS && body.contains("location.href")
     }
 
     /**
@@ -137,7 +174,12 @@ internal class PtcmsGuard {
         const val ALPHABET =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
         const val TOO_MANY_REQUESTS = 429
+        const val FORBIDDEN = 403
         const val MAX_RETRY = 3
+        /** 闸门正常只需重打一次;给两次是留给「www 与 m. 各一道」之类的意外 */
+        const val MAX_GATE_RETRY = 2
+        /** 闸门页实测 139~143 字节,真正的 403/错误页都是几 KB 起 */
+        const val GATE_MAX_CHARS = 600
         const val FIRST_BACKOFF_MS = 3000L
     }
 }
