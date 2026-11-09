@@ -1,7 +1,7 @@
 {
-  "version": 31,
+  "version": 32,
   "entry_package": "sources_by_cp2",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp2.jar",
-  "update_msg": "新增云图有声（数字图书馆的有声库：名著、历史、少儿、职场、养生）。原作者那版每本书只显示 200 集，这版章节一次拿全。音频直链，手表也能用。新源默认关闭，请到 设置 → 选择源站点 勾选。",
+  "update_msg": "新增书音FM：酷我畅听的库（5 万多本，TME 有声剧场、冠声文化等多人剧），和其它网文站的演播版本不同。音频直链，手表也能用。新源默认关闭，请到 设置 → 选择源站点 勾选。",
   "support_url": ""
 }
