@@ -1,7 +1,7 @@
 {
-  "version": 30,
+  "version": 31,
   "entry_package": "sources_by_cp2",
   "download_url": "https://raw.githubusercontent.com/chiaping55/tingshu/master/sources_by_cp2.jar",
-  "update_msg": "修复爱听书：站方 11 月起在所有页面前面加了一道验证（首次访问先发 cookie 再跳转），导致分类、搜索、章节全部打不开。现在会自动过这道验证，恢复正常，书架里的收藏不用重新添加。",
+  "update_msg": "新增云图有声（数字图书馆的有声库：名著、历史、少儿、职场、养生）。原作者那版每本书只显示 200 集，这版章节一次拿全。音频直链，手表也能用。新源默认关闭，请到 设置 → 选择源站点 勾选。",
   "support_url": ""
 }
